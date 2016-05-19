@@ -67,7 +67,7 @@ _start:
   csrr a0, mhartid
   # for now, assume only 1 core
   li a1, 1
-1:bgeu a0, a1, 1b
+#1:bgeu a0, a1, 1b
 
   # give each core 2KB of stack + TLS
 #define STKSHIFT 11
@@ -79,7 +79,7 @@ _start:
 
   la t0, _init
   csrw mepc, t0
-  eret
+  sret
 
 trap_entry:
   addi sp, sp, -272
@@ -155,7 +155,7 @@ trap_entry:
   lw x31, 248(sp)
 
   addi sp, sp, 272
-  eret
+  sret
 
 .section ".tdata.begin"
 .globl _tdata_begin

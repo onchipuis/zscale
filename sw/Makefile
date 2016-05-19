@@ -16,10 +16,10 @@ progs = \
 
 RISCV_PREFIX=riscv64-unknown-elf-
 RISCV_GCC = $(RISCV_PREFIX)gcc
-RISCV_GCC_OPTS = -m32 -static -Wa,-march=RVIM -std=gnu99 -O2 -fno-common -fno-builtin-printf
+RISCV_GCC_OPTS = -m32 -static -Wa,-march=RVIM -msoft-float -std=gnu99 -O0 -g -fno-common -fno-builtin-printf
 RISCV_LINK = $(RISCV_GCC) -m32 -T $(progdir)/common/test.ld
 RISCV_LINK_OPTS = -nostdlib -nostartfiles -ffast-math -lc -lgcc
-RISCV_OBJDUMP = $(RISCV_PREFIX)objdump --disassemble-all --disassemble-zeroes --section=.text --section=.text.startup --section=.data
+RISCV_OBJDUMP = $(RISCV_PREFIX)objdump -S --disassemble-all --disassemble-zeroes --section=.text --section=.text.startup --section=.data
 
 VPATH += $(addprefix $(progdir)/, $(progs))
 VPATH += $(progdir)/common

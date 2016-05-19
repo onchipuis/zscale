@@ -4,7 +4,7 @@
 
 void tohost_exit(long code)
 {
-  write_csr(mtohost, (code << 1) | 1);
+  write_csr(0x780, (code << 1) | 1);
   while (1);
 }
 
@@ -30,7 +30,9 @@ static long syscall(long num, long arg0, long arg1, long arg2)
 
 void exit(int code)
 {
-  syscall(SYS_exit, code, 0, 0);
+
+  tohost_exit(0);
+  //syscall(SYS_exit, code, 0, 0);
   while (1);
 }
 
