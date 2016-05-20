@@ -15,7 +15,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
     val ctrl = new CtrlDpathIO().flip
     val imem = new HastiMasterIO
     val dmem = new HastiMasterIO
-    val host = new HtifIO
+    val prci = new PRCITileIO().flip
   }
 
   val pc = Reg(init = UInt("h1fc", xLen))
@@ -84,6 +84,8 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   csr.io.cause := io.ctrl.id.cause
   csr.io.pc := id_pc
 
+  io.prci <> csr.io.prci
+
   // DMEM
   val dmem_req_addr = alu.io.adder_out
   val dmem_sgen = new StoreGen(io.ctrl.id.mem_type, dmem_req_addr, id_rs(1), 4)
@@ -148,7 +150,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   io.ctrl.csr_interrupt_cause := csr.io.interrupt_cause
 
   printf("Z%d: %d [%d] [%s%s%s%s%s%s|%s%s%s%s] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
-    io.host.id, csr.io.time(31, 0), !io.ctrl.killdx,
+    io.prci.id, csr.io.time(31, 0), !io.ctrl.killdx,
     Reg(init=45,next=Mux(!io.imem.hready, 73, 45)), // I -
     Reg(init=45,next=Mux(io.ctrl.id.br && io.ctrl.br_taken, 66, 45)), // B -
     Reg(init=45,next=Mux(io.ctrl.id.j, 74, 45)), // J -

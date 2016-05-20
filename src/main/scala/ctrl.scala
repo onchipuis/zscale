@@ -68,7 +68,7 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) {
     val dpath = new CtrlDpathIO
     val imem = new HastiMasterIO
     val dmem = new HastiMasterIO
-    val host = new HtifIO
+    val prci = new PRCITileIO().flip
   }
 
   io.imem.hwrite := Bool(false)
@@ -148,6 +148,7 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) {
       SCALL->     List(Y, N, N, N, CSR.I, A1_X,    A2_X,    IMM_X,  FN_X,      N, N, N, N, N, X, MT_X,  N),
       SBREAK->    List(Y, N, N, N, CSR.I, A1_X,    A2_X,    IMM_X,  FN_X,      N, N, N, N, N, X, MT_X,  N),
       SRET->      List(Y, N, N, N, CSR.I, A1_X,    A2_X,    IMM_X,  FN_X,      N, N, N, N, N, X, MT_X,  N),
+      MRET->      List(Y, N, N, N, CSR.I, A1_X,    A2_X,    IMM_X,  FN_X,      N, N, N, N, N, X, MT_X,  N),
 
       CSRRW->     List(Y, N, N, N, CSR.W, A1_RS1,  A2_ZERO, IMM_X,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N),
       CSRRS->     List(Y, N, N, N, CSR.S, A1_RS1,  A2_ZERO, IMM_X,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N),

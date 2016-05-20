@@ -29,7 +29,7 @@ class Zscale(resetSignal: Bool = null)(implicit val p: Parameters) extends Modul
   val io = new Bundle {
     val imem = new HastiMasterIO
     val dmem = new HastiMasterIO
-    val host = new HtifIO
+    val prci = new PRCITileIO().flip
   }
 
   val ctrl = Module(new Control)
@@ -41,6 +41,6 @@ class Zscale(resetSignal: Bool = null)(implicit val p: Parameters) extends Modul
   io.dmem <> dpath.io.dmem
   ctrl.io.dpath <> dpath.io.ctrl
 
-  ctrl.io.host <> io.host
-  dpath.io.host <> io.host
+  ctrl.io.prci <> io.prci
+  dpath.io.prci <> io.prci
 }
