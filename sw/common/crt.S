@@ -22,6 +22,9 @@ machine_trap_entry:
   .align 6
   .globl _start
 _start:
+  lui t0, 0x80000000 >> 12
+  jr t0
+  
   li  x1, 0
   li  x2, 0
   li  x3, 0
