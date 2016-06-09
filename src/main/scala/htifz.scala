@@ -76,8 +76,6 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   val state = Reg(init=state_rx)
 
   /* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv */
-  val (cnt, cnt_done) = Counter(/* TODO: (state === state_mem_wreq && io.mem.acquire.ready) || */
-                                 (state === state_mem_rresp && io.mem.hready), 64 * 8 / 4 /* TODO */)
   val rx_cmd = Mux(rx_word_count === UInt(0), next_cmd, cmd)
   when (state === state_rx && rx_done) {
     state := Mux(rx_cmd === cmd_readmem, state_mem_rreq,
@@ -116,6 +114,11 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   val memw_idle :: memw_first :: memw_wip :: Nil = Enum(UInt(), 3)
   val memw_state = Reg(init = memw_idle)
   val memw_data = Reg(Bits())
+  val memw_addr = Wire(Bits())
+  val hwaddr = Reg(Bits())
+  val hwrite = Reg(Bool())
+
+  val (cnt, cnt_done) = Counter((memw_state =/= memw_idle), dataBeats * short_request_bits / 32 /* TODO */)
 
   when (state === state_mem_rresp && len === UInt(0) /* cnt_done */) {
     state := Mux(cmd === cmd_readmem || pos === UInt(1),  state_tx, state_rx)
@@ -130,9 +133,13 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
     state := Mux(cmd === cmd_readmem && pos =/= UInt(0), state_mem_rreq, state_rx)
   }
 
-  io.mem.haddr := (addr << 3) + ((size * short_request_bits / 32 - len) << 2)/* TODO: replace with param */
+  io.mem.haddr := Mux(
+    (memw_state =/= memw_idle),
+    hwaddr,
+    (addr << 3) + ((size * short_request_bits / 32 - len) << 2)/* TODO: replace with param */
+  )
   io.mem.hsize := UInt(2) /* TODO: always 32-bit? */
-  io.mem.hwrite := (memw_state =/= memw_idle)
+  io.mem.hwrite := hwrite
   io.mem.hburst := HBURST_INCR
   io.mem.hprot := UInt("b0011") /* TODO: ??? */
   io.mem.hmastlock := Bool(false) /* TODO: ??? */
@@ -175,9 +182,14 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
     idx := (size * short_request_bits / 32 - len)
   }
 
-  memw_data := Mux(idx(0) === UInt(0), 
-                 packet_ram(idx * 32 / short_request_bits)(63, 32), 
-                 packet_ram(idx * 32 / short_request_bits)(31, 0))
+  memw_addr := idx * 32 / short_request_bits
+  hwaddr := (addr << 3) + ((size * short_request_bits / 32 - len) << 2)
+  hwrite := (memw_state =/= memw_idle)
+  when (memw_state =/= memw_idle) {
+    memw_data := Mux(idx(0) === UInt(1), 
+                 packet_ram(memw_addr)(63, 32), 
+                 packet_ram(memw_addr)(31, 0))
+  }
 
   when (state === state_mem_wresp && io.mem.hready) {
     state := Mux(cmd === cmd_readmem || pos === UInt(1), state_tx, state_rx)
