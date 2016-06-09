@@ -85,19 +85,8 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
              Mux(rx_cmd === cmd_readcr || rx_cmd === cmd_writecr, state_csr_req,
              state_tx)))
   }
-  /*
-  when (state === state_mem_wreq) {
-    when (cnt_done) { state := state_mem_wresp }
-  }
-  when (state === state_mem_rreq) {
-    when(io.mem.acquire.ready) { state := state_mem_rresp }
-  }
-  when (state === state_mem_wresp && io.mem.grant.valid) {
-    state := Mux(cmd === cmd_readmem || pos === UInt(1),  state_tx, state_rx)
-    pos := pos - UInt(1)
-    addr := addr + UInt(1 << offsetBits-3)
-  }
-  */
+
+
   /*
   val n = dataBits/short_request_bits
   val mem_req_data = (0 until n).map { i =>
@@ -124,6 +113,9 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   val len = Reg(UInt(width = log2Up(dataBits*dataBeats)))
   val idx = Reg(Bits())
   val first = Reg(init = Bool(false))
+  val memw_idle :: memw_first :: memw_wip :: Nil = Enum(UInt(), 3)
+  val memw_state = Reg(init = memw_idle)
+  val memw_data = Reg(Bits())
 
   when (state === state_mem_rresp && len === UInt(0) /* cnt_done */) {
     state := Mux(cmd === cmd_readmem || pos === UInt(1),  state_tx, state_rx)
@@ -139,33 +131,59 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   }
 
   io.mem.haddr := (addr << 3) + ((size * short_request_bits / 32 - len) << 2)/* TODO: replace with param */
-  io.mem.hsize := UInt(2)
-  io.mem.hwrite := (state=== state_mem_wreq)
+  io.mem.hsize := UInt(2) /* TODO: always 32-bit? */
+  io.mem.hwrite := (memw_state =/= memw_idle)
   io.mem.hburst := HBURST_INCR
   io.mem.hprot := UInt("b0011") /* TODO: ??? */
-  io.mem.hwdata := UInt(0) /* TODO: ??? */
+  io.mem.hmastlock := Bool(false) /* TODO: ??? */
+  io.mem.hwdata := memw_data
   io.mem.htrans := MuxLookup(state, HTRANS_IDLE, Seq(
-  /* TODO: state_mem_wreq -> Mux(io.mem.hready,
-      Mux(first, HTRANS_NONSEQ, HTRANS_SEQ),
-      Mux(first, HTRANS_IDLE, HTRANS_BUSY)),*/
+    state_mem_wreq -> Mux(io.mem.hready,
+      Mux(memw_state === memw_first, HTRANS_NONSEQ, HTRANS_SEQ),
+      Mux(memw_state === memw_first, HTRANS_IDLE, HTRANS_BUSY)),
     state_mem_rresp -> MuxCase(HTRANS_BUSY, Seq(
       first -> HTRANS_NONSEQ,
       (len === UInt(0)) -> HTRANS_IDLE,
       io.mem.hready -> HTRANS_SEQ))))
 
   when (state === state_mem_rreq) {
-    when(io.mem.hready) {
+    when(io.mem.hready && !first/* FIXME: ! should be === False? */) {
       state := state_mem_rresp
       first := Bool(true)
     }
-    len :=  size * short_request_bits / 32 /* TODO: 32 should be hasti data width */
+    len := size * short_request_bits / 32 /* TODO: 32 should be hasti data width */
   }
 
   when (state === state_mem_rresp && io.mem.hready) {
-        first := Bool(false)
-  	len := len - UInt(1)
-        idx := (size * short_request_bits / 32 - len)
-	when (len === UInt(0)) {state := state_tx}
+    first := Bool(false)
+    len := len - UInt(1)
+    idx := (size * short_request_bits / 32 - len)
+    when (len === UInt(0)) {state := state_tx}
+  }
+  
+  when (state === state_mem_wreq && io.mem.hready) {
+    memw_state := Mux(memw_state === memw_idle, memw_first, memw_wip)
+    
+    when (memw_state === memw_idle) {
+      len := size * short_request_bits / 32 /* TODO: 32 should be hasti data width */
+    }
+
+    when (memw_state =/= memw_idle) { len := len - UInt(1) }
+    
+    when (len === UInt(1/* XXX */)) { state := state_mem_wresp }
+
+    idx := (size * short_request_bits / 32 - len)
+  }
+
+  memw_data := Mux(idx(0) === UInt(0), 
+                 packet_ram(idx * 32 / short_request_bits)(63, 32), 
+                 packet_ram(idx * 32 / short_request_bits)(31, 0))
+
+  when (state === state_mem_wresp && io.mem.hready) {
+    state := Mux(cmd === cmd_readmem || pos === UInt(1), state_tx, state_rx)
+    pos := pos - UInt(1)
+    addr := addr + UInt(1 << offsetBits-3)
+    memw_state := memw_idle
   }
   
   //val n = dataBits / 32 /* TODO: 32 should be hasti data width */
@@ -185,6 +203,7 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
       packet_ram(idx * 32 / short_request_bits) := Cat(io.mem.hrdata, mem_rx_data)
     }
   }
+  
   /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
 
   val csrReadData = Reg(Bits(width = io.cpu(0).csr.resp.bits.getWidth))
