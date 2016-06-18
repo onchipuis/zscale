@@ -19,6 +19,7 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   val long_request_bits = short_request_bits + 64 * 8/* TODO: dataBits*dataBeats */
   require(short_request_bits % w == 0)
 
+  /*               13 + 6          - 4        = 15 */
   val rx_count_w = 13 + log2Up(64) - log2Up(w) // data size field is 12 bits
   val rx_count = Reg(init=UInt(0,rx_count_w))
   val rx_shifter = Reg(Bits(width = short_request_bits))
@@ -49,10 +50,16 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
     packet_ram(rx_word_count(log2Up(packet_ram_depth)-1,0) - UInt(1)) := rx_shifter_in
   }
 
+  /* cmd_readmem ::  0 */
+  /* cmd_writemem :: 1 */
+  /* cmd_readcr ::   2 */
+  /* cmd_writecr ::  3 */
+  /* cmd_ack ::      4 */
+  /* cmd_nack ::     5 */
   val cmd_readmem :: cmd_writemem :: cmd_readcr :: cmd_writecr :: cmd_ack :: cmd_nack :: Nil = Enum(UInt(), 6)
 
   val csr_addr = addr(io.cpu(0).csr.req.bits.addr.getWidth-1, 0)
-  val csr_coreid = addr(log2Up(nCores)-1+20+1,20)
+  val csr_coreid = addr(log2Up(nCores)-1+20+1,20) /* ? seems make sure always more then 1 bit so when coreid == all ones means SCR */
   val csr_wdata = packet_ram(0)
 
   val bad_mem_packet = size(offsetBits-1-3,0).orR || addr(offsetBits-1-3,0).orR
@@ -68,10 +75,24 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
     tx_count := tx_count + UInt(1)
   }
 
-  val rx_done = rx_word_done && Mux(rx_word_count === UInt(0), next_cmd =/= cmd_writemem && next_cmd =/= cmd_writecr, rx_word_count === size || rx_word_count(log2Up(packet_ram_depth)-1,0) === UInt(0))
+  val rx_done = 
+    rx_word_done &&
+    Mux(
+      rx_word_count === UInt(0), 
+      next_cmd =/= cmd_writemem && next_cmd =/= cmd_writecr,
+      rx_word_count === size || rx_word_count(log2Up(packet_ram_depth)-1,0) === UInt(0)
+    )
   val tx_size = Mux(!nack && (cmd === cmd_readmem || cmd === cmd_readcr || cmd === cmd_writecr), size, UInt(0))
   val tx_done = io.host.out.ready && tx_subword_count.andR && (tx_word_count === tx_size || tx_word_count > UInt(0) && packet_ram_raddr.andR)
 
+  /* state_rx ::         0
+     state_csr_req ::    1
+     state_csr_resp ::   2
+     state_mem_rreq ::   3
+     state_mem_wreq ::   4
+     state_mem_rresp ::  5
+     state_mem_wresp ::  6
+     state_tx ::         7 */
   val state_rx :: state_csr_req :: state_csr_resp :: state_mem_rreq :: state_mem_wreq :: state_mem_rresp :: state_mem_wresp :: state_tx :: Nil = Enum(UInt(), 8)
   val state = Reg(init=state_rx)
 
@@ -84,43 +105,21 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
              state_tx)))
   }
 
-
-  /*
-  val n = dataBits/short_request_bits
-  val mem_req_data = (0 until n).map { i =>
-    val ui = UInt(i, log2Up(n))
-    when (state === state_mem_rresp && io.mem.grant.valid) {
-      packet_ram(Cat(io.mem.grant.bits.addr_beat, ui)) := 
-        io.mem.grant.bits.data((i+1)*short_request_bits-1, i*short_request_bits)
-    }
-    packet_ram(Cat(cnt, ui))
-  }.reverse.reduce(_##_)
-
-  val init_addr = addr.toUInt >> (offsetBits-3)
-  io.mem.acquire.valid := state === state_mem_rreq || state === state_mem_wreq
-  io.mem.acquire.bits := Mux(cmd === cmd_writemem, 
-    PutBlock(
-      addr_block = init_addr,
-      addr_beat = cnt,
-      client_xact_id = UInt(0),
-      data = mem_req_data),
-    GetBlock(addr_block = init_addr))
-  io.mem.grant.ready := Bool(true)
-  */
   /* --------------------------------------------------------- */
+  /* for mem read */
   val len = Reg(UInt(width = log2Up(dataBits*dataBeats)))
   val idx = Reg(Bits())
-  val first = Reg(init = Bool(false))
+
+  /* for mem write */
   val memw_idle :: memw_first :: memw_wip :: Nil = Enum(UInt(), 3)
   val memw_state = Reg(init = memw_idle)
   val memw_data = Reg(Bits())
   val memw_addr = Wire(Bits())
+
   val hwaddr = Reg(Bits())
   val hwrite = Reg(Bool())
 
-  val (cnt, cnt_done) = Counter((memw_state =/= memw_idle), dataBeats * short_request_bits / 32 /* TODO */)
-
-  when (state === state_mem_rresp && len === UInt(0) /* cnt_done */) {
+  when (state === state_mem_rresp && len === UInt(0)) {
     state := Mux(cmd === cmd_readmem || pos === UInt(1),  state_tx, state_rx)
     pos := pos - UInt(1)
     addr := addr + UInt(1 << offsetBits-3)
@@ -136,76 +135,77 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   io.mem.haddr := Mux(
     (memw_state =/= memw_idle),
     hwaddr,
-    (addr << 3) + ((size * short_request_bits / 32 - len) << 2)/* TODO: replace with param */
+    (addr << 3) + ((size /* ?packet_ram_depth? */ * short_request_bits / 32 - len) << 2)/* TODO: replace with param */
   )
   io.mem.hsize := UInt(2) /* TODO: always 32-bit? */
   io.mem.hwrite := hwrite
-  io.mem.hburst := HBURST_INCR
+  io.mem.hburst := HBURST_SINGLE
   io.mem.hprot := UInt("b0011") /* TODO: ??? */
   io.mem.hmastlock := Bool(false) /* TODO: ??? */
   io.mem.hwdata := memw_data
   io.mem.htrans := MuxLookup(state, HTRANS_IDLE, Seq(
     state_mem_wreq -> Mux(io.mem.hready,
-      Mux(memw_state === memw_first, HTRANS_NONSEQ, HTRANS_SEQ),
+      HTRANS_NONSEQ,
       Mux(memw_state === memw_first, HTRANS_IDLE, HTRANS_BUSY)),
+    state_mem_rreq -> MuxCase(HTRANS_BUSY, Seq(
+      io.mem.hready -> HTRANS_NONSEQ)),
     state_mem_rresp -> MuxCase(HTRANS_BUSY, Seq(
-      first -> HTRANS_NONSEQ,
       (len === UInt(0)) -> HTRANS_IDLE,
-      io.mem.hready -> HTRANS_SEQ))))
+      io.mem.hready -> HTRANS_NONSEQ))))
 
+  /* mem read state */
   when (state === state_mem_rreq) {
-    when(io.mem.hready && !first/* FIXME: ! should be === False? */) {
+    when(io.mem.hready === Bool(true)) {
+      len := size /* ?packet_ram_depth? */ * short_request_bits / 32 /* TODO: 32 should be hasti data width */
       state := state_mem_rresp
-      first := Bool(true)
     }
-    len := size * short_request_bits / 32 /* TODO: 32 should be hasti data width */
   }
 
   when (state === state_mem_rresp && io.mem.hready) {
-    first := Bool(false)
     len := len - UInt(1)
-    idx := (size * short_request_bits / 32 - len)
+    idx := (size /* ?packet_ram_depth? */ * short_request_bits / 32 - len)
     when (len === UInt(0)) {state := state_tx}
   }
   
+  /* mem write state */
   when (state === state_mem_wreq && io.mem.hready) {
     memw_state := Mux(memw_state === memw_idle, memw_first, memw_wip)
     
     when (memw_state === memw_idle) {
-      len := size * short_request_bits / 32 /* TODO: 32 should be hasti data width */
+      memw_state := memw_first
+      /* len should be the max transmition sesson or packet_ram size but not total size
+       * TODO: 32 should be hasti data width */
+      len := packet_ram_depth * short_request_bits / 32 
+    }.elsewhen (memw_state =/= memw_wip) {
+      memw_state := memw_wip
+      len := len - UInt(1)
+    }.otherwise {
+      len := len - UInt(1)
+    }
+    
+    when (len === UInt(0/* XXX */)) {
+      state := state_mem_wresp 
+      memw_state := memw_idle
     }
 
-    when (memw_state =/= memw_idle) { len := len - UInt(1) }
-    
-    when (len === UInt(1/* XXX */)) { state := state_mem_wresp }
-
-    idx := (size * short_request_bits / 32 - len)
+    idx := packet_ram_depth * short_request_bits / 32 - len
   }
 
   memw_addr := idx * 32 / short_request_bits
-  hwaddr := (addr << 3) + ((size * short_request_bits / 32 - len) << 2)
+  hwaddr := (addr << 3) + ((packet_ram_depth * short_request_bits / 32 - len) << 2)
   hwrite := (memw_state =/= memw_idle)
-  when (memw_state =/= memw_idle) {
-    memw_data := Mux(idx(0) === UInt(1), 
-                 packet_ram(memw_addr)(63, 32), 
-                 packet_ram(memw_addr)(31, 0))
-  }
+  memw_data := Mux(idx(0) === UInt(1), 
+               packet_ram(memw_addr)(63, 32), 
+               packet_ram(memw_addr)(31, 0))
 
   when (state === state_mem_wresp && io.mem.hready) {
     state := Mux(cmd === cmd_readmem || pos === UInt(1), state_tx, state_rx)
     pos := pos - UInt(1)
     addr := addr + UInt(1 << offsetBits-3)
-    memw_state := memw_idle
+    
+    len := len - UInt(1)
   }
   
-  //val n = dataBits / 32 /* TODO: 32 should be hasti data width */
-  /*val mem_req_data = (0 until n).map { i =>
-    val ui = UInt(i, log2Up(n))
-    when (state === state_mem_rresp && io.mem.hready) {
-      packet_ram(Cat()) := io.mem.hrdata
-    }
-    packet_ram(Cat(cnt, ui))
-  }.reverse.reduce(_##_)*/
   val mem_rx_data = Reg(Bits(width = 32 /* TODO */))
   when (state === state_mem_rresp && io.mem.hready) {
     when (idx(0) === UInt(0)) {
@@ -216,30 +216,40 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
     }
   }
   
-  /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
-
+  /* CSR R/W --------------------------------------------------------------- */
   val csrReadData = Reg(Bits(width = io.cpu(0).csr.resp.bits.getWidth))
+
+  /* for each core */
   for (i <- 0 until nCores) {
     val my_reset = Reg(init=Bool(true))
 
     val cpu = io.cpu(i)
     val me = csr_coreid === UInt(i)
+
+    /* if the csr request addr is not reset then pass it to CSR module */
     cpu.csr.req.valid := state === state_csr_req && me && csr_addr =/= UInt(csr_RESET)
     cpu.csr.req.bits.rw := cmd === cmd_writecr
     cpu.csr.req.bits.addr := csr_addr
     cpu.csr.req.bits.data := csr_wdata
     cpu.reset := my_reset
 
+    /* once CSR request fired, move state to state_csr_resp */
     when (cpu.csr.req.fire()) { state := state_csr_resp }
 
+    /* if the csr request addr is RESET then reset it directly */
     when (state === state_csr_req && me && csr_addr === UInt(csr_RESET)) {
       when (cmd === cmd_writecr) {
         my_reset := csr_wdata(0)
       }
+
+      /* send back the current reset state */
       csrReadData := my_reset.toBits
+
+      /* response to host */
       state := state_tx
     }
 
+    /* wait CPU CSR response then response host */
     cpu.csr.resp.ready := Bool(true)
     when (state === state_csr_resp && cpu.csr.resp.valid) {
       csrReadData := cpu.csr.resp.bits
@@ -270,3 +280,4 @@ class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasH
   io.host.out.valid := state === state_tx
   io.host.out.bits := tx_data >> Cat(tx_count(log2Up(short_request_bits/w)-1,0), Bits(0, log2Up(w)))
 }
+// vim:et:ts=2:sw=2:softtabstop=2
