@@ -1,1 +1,1 @@
-package object zscale extends junctions.HastiConstants with junctions.PociConstants
+package object zscale extends rocket.constants.ScalarOpConstants

@@ -1,8 +1,10 @@
 package zscale
 
 import Chisel._
-import cde.Parameters
+import Chisel.ImplicitConversions._
+import config._
 import junctions._
+import HastiConstants._
 
 class HastiROM(contents: Seq[Byte])(implicit p: Parameters) extends HastiModule()(p) {
   val io = new HastiSlaveIO
@@ -20,6 +22,6 @@ class HastiROM(contents: Seq[Byte])(implicit p: Parameters) extends HastiModule(
   rdata := rom(raddr).toBits
 
   io.hrdata := rdata
-  io.hreadyout := Bool(true)
+  io.hready := Bool(true)
   io.hresp := HRESP_OKAY
 }

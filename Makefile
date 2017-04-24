@@ -1,5 +1,4 @@
 SBT := sbt
-# -DchiselVersion=2.11-3.1-SNAPSHOT -DuncoreVersion=2.0 -DrocketVersion=1.2
 FIRRTL_JAR ?= rocket-chip/firrtl/utils/bin/firrtl.jar
 FIRRTL ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -cp $(FIRRTL_JAR) firrtl.Driver
 
@@ -21,7 +20,7 @@ $(FIRRTL_JAR): $(shell find rocket-chip/firrtl/src/main/scala -iname "*.scala")
 clean:
 	#make -C rocket-chip/chisel3 clean
 	$(MAKE) -C rocket-chip/firrtl clean
-	$(SBT) clean
+	$(SBT) clean compiler-cache clean-files
 	rm -rfv ./lib $(FIRRTL_JAR)
 
 .PHONY: compile

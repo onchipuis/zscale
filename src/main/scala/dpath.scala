@@ -3,29 +3,31 @@
 package zscale
 
 import Chisel._
-import cde.Parameters
+import Chisel.ImplicitConversions._
+import config._
 import junctions._
 import uncore._
 import rocket._
-import rocket.Util._
-import rocket.ALU._
+import util._
+import ALU._
+import HastiConstants._
 
 class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val io = new Bundle {
     val ctrl = new CtrlDpathIO().flip
     val imem = new HastiMasterIO
     val dmem = new HastiMasterIO
-    val prci = new PRCITileIO().flip
+    //val prci = new PRCITileIO().flip
   }
 
   val pc = Reg(init = UInt("h1000", xLen))
   val id_br_target = Wire(UInt())
-  val csr = Module(new rocket.CSRFile()(p.alterPartial({
+  val csr = Module(new rocket.CSRFile()/*(p.alterPartial({  // TODO: CSR does not support being extern-parametized
     case UseVM => false
     case XLen => 32
     case UseFPU => false
-  })))
-  val xcpt = io.ctrl.id.xcpt || io.ctrl.csr_xcpt
+  }))*/)
+  val xcpt = io.ctrl.id.xcpt/* || io.ctrl.csr_xcpt*/  // TODO: Exceptions from CSR?
 
   val npc = (Mux(io.ctrl.id.j || io.ctrl.id.br && io.ctrl.br_taken, id_br_target,
              Mux(xcpt || io.ctrl.csr_eret, csr.io.evec,
@@ -64,7 +66,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
       A1_PC -> id_pc.toSInt
     )).toUInt
   alu.io.in2 := MuxLookup(io.ctrl.id.sel_alu2, SInt(0), Seq(
-      A2_FOUR -> SInt(4),
+      A2_SIZE -> SInt(4),
       A2_RS2 -> id_rs(1).toSInt,
       A2_IMM -> id_imm
     )).toUInt
@@ -84,7 +86,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   csr.io.cause := io.ctrl.id.cause
   csr.io.pc := id_pc
 
-  io.prci <> csr.io.prci
+  //io.prci <> csr.io.prci
 
   // DMEM
   val dmem_req_addr = alu.io.adder_out
@@ -99,13 +101,22 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
 
   val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.dmem.hready
   val dmem_resp_valid = dmem_clear_sb && !io.ctrl.ll.mem_rw
-  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, dmem_load_lowaddr, io.dmem.hrdata, Bool(false), 4)
+  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.dmem.hrdata, Bool(false), 4)
 
   // MUL/DIV
   val (mulDivRespValid, mulDivRespData, mulDivReqReady) = if (haveMExt) {
-    val muldiv = Module(new MulDiv(width = xLen,
+    /*val mulDivParams = MulDivParams()
+    mulDivParams.mulUnroll = if(fastMulDiv) 8 else 1
+    mulDivParams.divUnroll = if(fastMulDiv) 8 else 1
+    mulDivParams.mulEarlyOut = fastMulDiv
+    mulDivParams.divEarlyOut = fastMulDiv*/
+    val muldiv = Module(new MulDiv(MulDivParams(mulUnroll = if(fastMulDiv) 8 else 1,
+                                   divUnroll = if(fastMulDiv) 8 else 1,
+                                   mulEarlyOut = fastMulDiv,
+                                   divEarlyOut = fastMulDiv),
+                                   width = xLen/*,  // TODO: Check this things
                                    unroll = if(fastMulDiv) 8 else 1,
-                                   earlyOut = fastMulDiv))
+                                   earlyOut = fastMulDiv*/))
     muldiv.io.req.valid := io.ctrl.id.mul_valid
     muldiv.io.req.bits.fn := io.ctrl.id.fn_alu
     muldiv.io.req.bits.dw := DW_64
@@ -113,8 +124,8 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
     muldiv.io.req.bits.in2 := id_rs(1)
     muldiv.io.kill := Bool(false)
     muldiv.io.resp.ready := Bool(true)
-    (muldiv.io.resp.valid, muldiv.io.resp.bits.data, muldiv.io.req.ready)
-  } else (Bool(false), UInt(0), Bool(false))
+    (Wire(muldiv.io.resp.valid), Wire(muldiv.io.resp.bits.data), Wire(muldiv.io.req.ready))
+  } else (Wire(Bool(false)), Wire(UInt(0)), Wire(Bool(false)))
 
   // WB
   val ll_wen = dmem_resp_valid || mulDivRespValid
@@ -144,13 +155,13 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   io.ctrl.br_taken := alu.io.out(0)
   io.ctrl.mul_ready := mulDivReqReady
   io.ctrl.clear_sb := dmem_clear_sb || mulDivRespValid
-  io.ctrl.csr_xcpt := csr.io.csr_xcpt
+  //io.ctrl.csr_xcpt := csr.io.csr_xcpt // TODO: Exceptions from CSR?
   io.ctrl.csr_eret := csr.io.eret
   io.ctrl.csr_interrupt := csr.io.interrupt
   io.ctrl.csr_interrupt_cause := csr.io.interrupt_cause
 
   printf("Z%d: %d [%d] [%s%s%s%s%s%s|%s%s%s%s] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
-    io.prci.id, csr.io.time(31, 0), !io.ctrl.killdx,
+    csr.io.hartid, csr.io.time(31, 0), !io.ctrl.killdx,
     Reg(init=45,next=Mux(!io.imem.hready, 73, 45)), // I -
     Reg(init=45,next=Mux(io.ctrl.id.br && io.ctrl.br_taken, 66, 45)), // B -
     Reg(init=45,next=Mux(io.ctrl.id.j, 74, 45)), // J -

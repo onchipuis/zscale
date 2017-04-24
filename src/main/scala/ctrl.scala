@@ -3,13 +3,16 @@
 package zscale
 
 import Chisel._
-import cde.Parameters
-import junctions._
-import uncore._
+import Chisel.ImplicitConversions._
 import rocket._
-import rocket.Util._
-import rocket.ALU._
-import rocket.Instructions._
+import Instructions._
+import uncore.constants.MemoryOpConstants._
+import ALU._
+import config._
+import tile.HasCoreParameters
+import util._
+import junctions._
+import HastiConstants._
 
 class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
   val stallf = Bool(OUTPUT)
@@ -50,7 +53,7 @@ class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
   val br_taken = Bool(INPUT)
   val mul_ready = Bool(INPUT)
   val clear_sb = Bool(INPUT)
-  val csr_xcpt = Bool(INPUT)
+  //val csr_xcpt = Bool(INPUT) // TODO: Exceptions from CSR?
   val csr_eret = Bool(INPUT)
   val csr_interrupt = Bool(INPUT)
   val csr_interrupt_cause = UInt(INPUT, xLen)
@@ -63,12 +66,12 @@ class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
   }
 }
 
-class Control(implicit p: Parameters) extends ZscaleModule()(p) {
+class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeConstants*/ {
   val io = new Bundle {
     val dpath = new CtrlDpathIO
     val imem = new HastiMasterIO
     val dmem = new HastiMasterIO
-    val prci = new PRCITileIO().flip
+    //val prci = new PRCITileIO().flip
   }
 
   io.imem.hwrite := Bool(false)
@@ -102,8 +105,9 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) {
       LUI->       List(Y, N, N, N, CSR.N, A1_ZERO, A2_IMM,  IMM_U,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N),
       AUIPC->     List(Y, N, N, N, CSR.N, A1_PC,   A2_IMM,  IMM_U,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N),
 
-      JAL->       List(Y, Y, N, N, CSR.N, A1_PC,   A2_FOUR, IMM_UJ, FN_ADD,    Y, N, N, N, N, X, MT_X,  N),
-      JALR->      List(Y, Y, N, N, CSR.N, A1_PC,   A2_FOUR, IMM_I,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N),
+      // TODO: Why JAL and JALR have the same s_aluX?
+      JAL->       List(Y, Y, N, N, CSR.N, A1_PC,   A2_SIZE, IMM_UJ, FN_ADD,    Y, N, N, N, N, X, MT_X,  N),
+      JALR->      List(Y, Y, N, N, CSR.N, A1_PC,   A2_SIZE, IMM_I,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N),
 
       BEQ->       List(Y, N, Y, N, CSR.N, A1_RS1,  A2_RS2,  IMM_SB, FN_SEQ,    N, Y, Y, N, N, X, MT_X,  N),
       BNE->       List(Y, N, Y, N, CSR.N, A1_RS1,  A2_RS2,  IMM_SB, FN_SNE,    N, Y, Y, N, N, X, MT_X,  N),
@@ -200,23 +204,25 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) {
   val (id_xcpt_nomem, id_cause_nomem) = checkExceptions(List(
     (io.dpath.csr_interrupt, io.dpath.csr_interrupt_cause),
     (io.dpath.ma_pc, UInt(Causes.misaligned_fetch)),
-    (imem_bus_error, UInt(Causes.fault_fetch)),
-    (!id_sb_stall && id_valid && !id_inst_valid, UInt(Causes.illegal_instruction)) ))
+    (imem_bus_error, UInt(Causes.fetch_access)),  // TODO: This was "fault_fetch"
+    (!id_sb_stall && id_valid && !id_inst_valid, UInt(Causes.illegal_instruction)) 
+    ))
 
   val (id_xcpt, id_cause) = checkExceptions(List(
     (id_xcpt_nomem, id_cause_nomem),
     (id_ok && id_mem_valid && !id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_load)),
-    (id_ok && id_mem_valid &&  id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_store)),
-    (dmem_bus_error && !ll_mem_rw, UInt(Causes.fault_load)),
-    (dmem_bus_error &&  ll_mem_rw, UInt(Causes.fault_store)) ))
+    (id_ok && id_mem_valid &&  id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_store))/*,
+    (dmem_bus_error && !ll_mem_rw, UInt(Causes.load_access)), // TODO: This was "fault_x"
+    (dmem_bus_error &&  ll_mem_rw, UInt(Causes.store_access)) */
+    ))
 
   val id_retire_nomem_exclude_csr = id_ok && !id_xcpt_nomem
-  val id_retire_nomem = id_retire_nomem_exclude_csr && !io.dpath.csr_xcpt
-  val id_retire = id_ok && !id_xcpt && !io.dpath.csr_xcpt
+  val id_retire_nomem = id_retire_nomem_exclude_csr// && !io.dpath.csr_xcpt // TODO: Exception from CSR?
+  val id_retire = id_ok && !id_xcpt// && !io.dpath.csr_xcpt // TODO: Exception from CSR?
 
   val id_imem_invalidate = id_retire_nomem && id_fence_i
   val id_br_taken = io.dpath.id.br && io.dpath.br_taken
-  val id_redirect = io.dpath.id.j || id_br_taken || id_xcpt || io.dpath.csr_xcpt || io.dpath.csr_eret
+  val id_redirect = io.dpath.id.j || id_br_taken || id_xcpt/* || io.dpath.csr_xcpt*/ || io.dpath.csr_eret // TODO: Exception from CSR?
   when (id_redirect && !io.imem.hready) { if_kill := Bool(true) }
   when (if_kill && io.imem.hready) { if_kill := Bool(false) }
 

@@ -3,8 +3,9 @@ package zscale
 import Chisel._
 import Chisel.ImplicitConversions._
 import junctions._
+import HastiConstants._
 import junctions.NastiConstants._
-import cde.{Parameters, Field}
+import config._
 import uncore._
 
 class HtifZ(csr_RESET: Int)(implicit val p: Parameters) extends Module with HasHtifParameters {

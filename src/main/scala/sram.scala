@@ -1,8 +1,10 @@
 package zscale
 
 import Chisel._
-import cde.Parameters
+import Chisel.ImplicitConversions._
+import config._
 import junctions._
+import HastiConstants._
 
 class HastiSRAM(depth: Int)(implicit p: Parameters) extends HastiModule()(p) {
   val io = new HastiSlaveIO
@@ -49,6 +51,6 @@ class HastiSRAM(depth: Int)(implicit p: Parameters) extends HastiModule()(p) {
   val rmask = FillInterleaved(8, wmask & Fill(hastiDataBits / 8, bypass))
   io.hrdata := (wdata.toBits & rmask) | (rdata & ~rmask)
 
-  io.hreadyout := Bool(true)
+  io.hready := Bool(true)
   io.hresp := HRESP_OKAY
 }
