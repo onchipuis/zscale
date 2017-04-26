@@ -11,33 +11,42 @@ import rocket._
 import util._
 import ALU._
 import HastiConstants._
+import tile._
+
+// TODO: This class is only used for create our CSR/ALU
+case class CSRALUTileParams(implicit p: Parameters) extends TileParams {
+  val icache = None
+  val dcache = None
+  val btb = None
+  val rocc = Nil
+  val core = RocketCoreParams(nPMPs = 0) //TODO remove this
+}
 
 class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val io = new Bundle {
     val ctrl = new CtrlDpathIO().flip
-    val imem = new HastiMasterIO
-    val dmem = new HastiMasterIO
+    val mem = new MemIO
+    //val imem = new HastiMasterIO
+    //val dmem = new HastiMasterIO
     //val prci = new PRCITileIO().flip
   }
 
   val pc = Reg(init = UInt("h1000", xLen))
   val id_br_target = Wire(UInt())
-  val csr = Module(new rocket.CSRFile()/*(p.alterPartial({  // TODO: CSR does not support being extern-parametized
-    case UseVM => false
-    case XLen => 32
-    case UseFPU => false
-  }))*/)
+  val csr = Module(new rocket.CSRFile()( p.alterPartial({
+      case TileKey => CSRALUTileParams()
+    }) ))
   val xcpt = io.ctrl.id.xcpt/* || io.ctrl.csr_xcpt*/  // TODO: Exceptions from CSR?
 
   val npc = (Mux(io.ctrl.id.j || io.ctrl.id.br && io.ctrl.br_taken, id_br_target,
              Mux(xcpt || io.ctrl.csr_eret, csr.io.evec,
-                 pc + UInt(4))).toSInt & SInt(-2)).toUInt
+                 pc + UInt(4))).asSInt & SInt(-2)).asUInt
 
   when (!io.ctrl.stallf) {
     pc := npc
   }
 
-  io.imem.haddr := Mux(io.ctrl.stallf, pc, npc)
+  io.mem.imem.haddr := Mux(io.ctrl.stallf, pc, npc)
 
   val id_pc = Reg(UInt(width = xLen))
   val id_inst = Reg(Bits(width = coreInstBits))
@@ -49,7 +58,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   // !io.ctrl.killf is a power optimization (clock-gating)
   when (!io.ctrl.stalldx && !io.ctrl.killf) {
     id_pc := pc
-    id_inst := io.imem.hrdata
+    id_inst := io.mem.imem.hrdata
   }
 
   val rf = new RegFile(if (haveEExt) 15 else 31, 32, true)
@@ -59,21 +68,24 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val id_imm = ImmGen(io.ctrl.id.sel_imm, id_inst)
 
   // ALU
-  val alu = Module(new ALU)
+  val alu = Module(new ALU()( p.alterPartial({
+      case TileKey => CSRALUTileParams()
+    })
+  ))
   alu.io.fn := io.ctrl.id.fn_alu
   alu.io.in1 := MuxLookup(io.ctrl.id.sel_alu1, SInt(0), Seq(
-      A1_RS1 -> id_rs(0).toSInt,
-      A1_PC -> id_pc.toSInt
-    )).toUInt
+      A1_RS1 -> id_rs(0).asSInt,
+      A1_PC -> id_pc.asSInt
+    )).asUInt
   alu.io.in2 := MuxLookup(io.ctrl.id.sel_alu2, SInt(0), Seq(
       A2_SIZE -> SInt(4),
-      A2_RS2 -> id_rs(1).toSInt,
+      A2_RS2 -> id_rs(1).asSInt,
       A2_IMM -> id_imm
-    )).toUInt
+    )).asUInt
 
   // BRANCH TARGET
   // jalr only takes rs1, jump and branches take pc
-  id_br_target := (Mux(io.ctrl.id.j && io.ctrl.id.sel_imm === IMM_I, id_rs(0), id_pc).toSInt + id_imm).toUInt
+  id_br_target := (Mux(io.ctrl.id.j && io.ctrl.id.sel_imm === IMM_I, id_rs(0), id_pc).asSInt + id_imm).asUInt
 
   // CSR
   val csr_operand = alu.io.adder_out
@@ -94,14 +106,14 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val dmem_load_lowaddr = RegEnable(dmem_req_addr(1, 0), io.ctrl.id.mem_valid && !io.ctrl.id.mem_rw)
   when (io.ctrl.id.mem_valid && io.ctrl.id.mem_rw) { wb_wdata := dmem_sgen.data } // share wb_wdata with store data
 
-  io.dmem.haddr := dmem_req_addr
-  io.dmem.hwrite := io.ctrl.id.mem_rw
-  io.dmem.hsize := dmem_sgen.size
-  io.dmem.hwdata := wb_wdata
+  io.mem.dmem.haddr := dmem_req_addr
+  io.mem.dmem.hwrite := io.ctrl.id.mem_rw
+  io.mem.dmem.hsize := dmem_sgen.size
+  io.mem.dmem.hwdata := wb_wdata
 
-  val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.dmem.hready
+  val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.mem.dmem.hready
   val dmem_resp_valid = dmem_clear_sb && !io.ctrl.ll.mem_rw
-  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.dmem.hrdata, Bool(false), 4)
+  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.mem.dmem.hrdata, Bool(false), 4)
 
   // MUL/DIV
   val (mulDivRespValid, mulDivRespData, mulDivReqReady) = if (haveMExt) {
@@ -160,9 +172,11 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   io.ctrl.csr_interrupt := csr.io.interrupt
   io.ctrl.csr_interrupt_cause := csr.io.interrupt_cause
 
-  printf("Z%d: %d [%d] [%s%s%s%s%s%s|%s%s%s%s] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
+  // TODO: inb4
+  //printf("Z%d: %d [%d] [%s%s%s%s%s%s|%s%s%s%s] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
+  printf("Z%d: %d [%d] [%x%x%x%x%x%x|%x%x%x%x] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
     csr.io.hartid, csr.io.time(31, 0), !io.ctrl.killdx,
-    Reg(init=45,next=Mux(!io.imem.hready, 73, 45)), // I -
+    Reg(init=45,next=Mux(!io.mem.imem.hready, 73, 45)), // I -
     Reg(init=45,next=Mux(io.ctrl.id.br && io.ctrl.br_taken, 66, 45)), // B -
     Reg(init=45,next=Mux(io.ctrl.id.j, 74, 45)), // J -
     Reg(init=45,next=Mux(io.ctrl.logging.invalidate, 86, 45)), // V -

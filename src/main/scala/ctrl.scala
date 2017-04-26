@@ -14,6 +14,27 @@ import util._
 import junctions._
 import HastiConstants._
 
+import tile.XLen 
+
+class MemIO(implicit p: Parameters) extends Bundle {
+    val imem = new HastiMasterIO()(p.alterPartial({
+      case HastiId => "00000"
+      case HastiKey("00000") => 
+        HastiParameters(
+          dataBits=p(XLen),
+          addrBits=p(XLen)
+        )
+    }))
+    val dmem = new HastiMasterIO()(p.alterPartial({
+      case HastiId => "00001"
+      case HastiKey("00001") => 
+        HastiParameters(
+          dataBits=p(XLen),
+          addrBits=p(XLen)
+        )
+    }))
+}
+
 class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
   val stallf = Bool(OUTPUT)
   val killf = Bool(OUTPUT)
@@ -69,17 +90,18 @@ class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
 class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeConstants*/ {
   val io = new Bundle {
     val dpath = new CtrlDpathIO
-    val imem = new HastiMasterIO
-    val dmem = new HastiMasterIO
+    val mem = new MemIO
+    //val imem = new HastiMasterIO
+    //val dmem = new HastiMasterIO
     //val prci = new PRCITileIO().flip
   }
 
-  io.imem.hwrite := Bool(false)
-  io.imem.hsize := UInt("b010")
-  io.imem.hburst := HBURST_SINGLE
-  io.imem.hprot := UInt("b0011")
-  io.imem.htrans := HTRANS_NONSEQ
-  io.imem.hmastlock := Bool(false)
+  io.mem.imem.hwrite := Bool(false)
+  io.mem.imem.hsize := UInt("b010")
+  io.mem.imem.hburst := HBURST_SINGLE
+  io.mem.imem.hprot := UInt("b0011")
+  io.mem.imem.htrans := HTRANS_NONSEQ
+  io.mem.imem.hmastlock := Bool(false)
 
   val if_kill = Reg(init = Bool(true))
   val id_valid = Reg(init = Bool(false))
@@ -186,7 +208,7 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   val id_csr = Mux(id_csr_ren, CSR.R, _id_csr)
 
   val id_sb_stall = ll_valid
-  val id_dmem_stall = io.dpath.id.mem_valid && !io.dmem.hready
+  val id_dmem_stall = io.dpath.id.mem_valid && !io.mem.dmem.hready
   val id_mul_stall = io.dpath.id.mul_valid && !io.dpath.mul_ready
 
   val id_regs_valid =
@@ -198,8 +220,8 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   def checkExceptions(x: Seq[(Bool, UInt)]) =
     (x.map(_._1).reduce(_||_), PriorityMux(x))
 
-  val imem_bus_error = io.imem.hready && io.imem.hresp === HRESP_ERROR
-  val dmem_bus_error = io.dmem.hready && io.dmem.hresp === HRESP_ERROR
+  val imem_bus_error = io.mem.imem.hready && io.mem.imem.hresp === HRESP_ERROR
+  val dmem_bus_error = io.mem.dmem.hready && io.mem.dmem.hresp === HRESP_ERROR
 
   val (id_xcpt_nomem, id_cause_nomem) = checkExceptions(List(
     (io.dpath.csr_interrupt, io.dpath.csr_interrupt_cause),
@@ -223,14 +245,14 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   val id_imem_invalidate = id_retire_nomem && id_fence_i
   val id_br_taken = io.dpath.id.br && io.dpath.br_taken
   val id_redirect = io.dpath.id.j || id_br_taken || id_xcpt/* || io.dpath.csr_xcpt*/ || io.dpath.csr_eret // TODO: Exception from CSR?
-  when (id_redirect && !io.imem.hready) { if_kill := Bool(true) }
-  when (if_kill && io.imem.hready) { if_kill := Bool(false) }
+  when (id_redirect && !io.mem.imem.hready) { if_kill := Bool(true) }
+  when (if_kill && io.mem.imem.hready) { if_kill := Bool(false) }
 
-  io.dpath.stallf := !id_redirect && (if_kill || !io.imem.hready || id_imem_invalidate || io.dpath.stalldx || io.dpath.stallw)
-  io.dpath.killf := !io.imem.hready || if_kill || io.dpath.csr_interrupt || id_imem_invalidate || id_redirect
+  io.dpath.stallf := !id_redirect && (if_kill || !io.mem.imem.hready || id_imem_invalidate || io.dpath.stalldx || io.dpath.stallw)
+  io.dpath.killf := !io.mem.imem.hready || if_kill || io.dpath.csr_interrupt || id_imem_invalidate || id_redirect
   io.dpath.stalldx := id_sb_stall || id_dmem_stall || id_mul_stall || io.dpath.stallw
   io.dpath.killdx := !id_retire || io.dpath.stalldx
-  io.dpath.stallw := ll_valid && !ll_fn && !io.dmem.hready
+  io.dpath.stallw := ll_valid && !ll_fn && !io.mem.dmem.hready
 
   io.dpath.id.j := id_retire_nomem && id_j
   io.dpath.id.br := id_retire_nomem && id_br
@@ -254,10 +276,10 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   io.dpath.ll.mem_rw := ll_mem_rw
   io.dpath.ll.mem_type := ll_mem_type
 
-  io.dmem.hburst := HBURST_SINGLE
-  io.dmem.hprot := UInt("b0011")
-  io.dmem.hmastlock := Bool(false)
-  io.dmem.htrans := Mux(io.dpath.id.mem_valid, HTRANS_NONSEQ, HTRANS_IDLE)
+  io.mem.dmem.hburst := HBURST_SINGLE
+  io.mem.dmem.hprot := UInt("b0011")
+  io.mem.dmem.hmastlock := Bool(false)
+  io.mem.dmem.htrans := Mux(io.dpath.id.mem_valid, HTRANS_NONSEQ, HTRANS_IDLE)
 
   // have to clear sb first before setting, because id_sb_stall is bypassed
   when (io.dpath.clear_sb) {

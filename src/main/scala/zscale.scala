@@ -9,20 +9,19 @@ import junctions._
 import HastiConstants._
 import util.ParameterizedBundle // IMPORTANT: Before uncore.util
 import uncore._
-import rocket._
 
-// TODO: For XLen and CoreParams (check)
-import tile._
+import tile.XLen 
 
 trait HasZscaleParameters {
   implicit val p: Parameters
-  val xLen = 32 //p(XLen) // TODO: Forced to this value. Do now know why they extract it from Parameters class
-  val coreInstBits = /*if (useCompressed) 16 else */32
-  val fastMulDiv = false // p(FastMulDiv)
+  val xLen = p(XLen)
+  val coreInstBits = if (p(useCExt)) 16 else 32
+  val fastMulDiv = p(FastMulDiv)
 
   // these should become parameters, rather than constants
-  val haveMExt = true
-  val haveEExt = false
+  val haveMExt = p(useMExt)
+  val haveEExt = p(useEExt)
+  val haveCExt = p(useCExt)
 }
 
 abstract class ZscaleModule(implicit val p: Parameters) extends Module
@@ -33,18 +32,17 @@ abstract class ZscaleBundle(implicit val p: Parameters) extends ParameterizedBun
 class Zscale(resetSignal: Bool = null)(implicit val p: Parameters) extends Module(_reset = resetSignal)
     with HasZscaleParameters {
   val io = new Bundle {
-    val imem = new HastiMasterIO
-    val dmem = new HastiMasterIO
+    val mem = new MemIO
     //val prci = new PRCITileIO().flip
   }
 
   val ctrl = Module(new Control)
   val dpath = Module(new Datapath)
 
-  io.imem <> ctrl.io.imem
-  io.imem <> dpath.io.imem
-  io.dmem <> ctrl.io.dmem
-  io.dmem <> dpath.io.dmem
+  io.mem.imem <> ctrl.io.mem.imem
+  io.mem.imem <> dpath.io.mem.imem
+  io.mem.dmem <> ctrl.io.mem.dmem
+  io.mem.dmem <> dpath.io.mem.dmem
   ctrl.io.dpath <> dpath.io.ctrl
 
   //ctrl.io.prci <> io.prci

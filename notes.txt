@@ -1,0 +1,64 @@
+in rocket-chip:
+"Usage: sbt> " + 
+      "run TargetDir TopModuleProjectName TopModuleName " +
+      "ConfigProjectName ConfigNameString"
+sbt "run-main rocketchip.Generator ./vsim/generated-src-2 rocketchip TestHarness rocketchip TinyConfig"
+(NOTE: sbt "run-main rocketchip.Generator" is "run")
+
+class TestHarness()(implicit p: Parameters) extends Module {
+Works with modules for top (see up), doesnt work:
+sbt "run-main rocketchip.Generator ./vsim/generated-src-2 rocketchip ExampleRocketTop rocketchip TinyConfig"
+Because ExampleRocketTop is not exactly a module, unless:
+val dut = Module(LazyModule(new ExampleRocketTop).module) // Extracted from TestHarness
+
+// ************************************************************************************
+// ** About the Config classes
+Seems that ConfigNameString can be chaineable using underscores ("_") (util/GeneratorUtils.scala)
+But seems healther to use a custom Config.scala file.
+
+// ************************************************************************************
+// ** About the Parameters
+For extracting abstract class Parameters, uses the Config class.
+There is a Parameters.root() in Config.scala (inside config/Config.scala) because:
+
+  def getParameters(names: ParsedInputNames): Parameters = getParameters(getConfig(names))    (util/GeneratorUtils.scala)
+
+  def getParameters(config: Config): Parameters = Parameters.root(config.toInstance)
+
+About the Parameters.root():
+class Config(p: Parameters) extends Parameters    (config/Config.scala)
+Seems that Config class is a Parameters class whose can be alterated using functions
+object Parameters {
+  def empty:                                                    Parameters = new EmptyParameters
+  def apply(f: (View, View, View) => PartialFunction[Any,Any]): Parameters = new PartialParameters(f)
+  def root(p: Parameters) = p
+}
+Just obtains the Config class as Parameters
+REMEMBER: All classes/modules/bundles uses p: Parameters as constructor variable (maybe?)
+
+// ************************************************************************************
+// ** About the Top module extraction
+There is a single String:
+val fullTopModuleClass: String = topModuleProject + "." + topModuleClass (util/GeneratorUtils.scala)
+
+Seems to be used in a future: HasGeneratorUtils
+import chisel3.internal.firrtl.Circuit
+  def elaborate(names: ParsedInputNames, params: Parameters): Circuit = {  (util/GeneratorUtils.scala)
+    val gen = () =>
+      Class.forName(names.fullTopModuleClass)
+        .getConstructor(classOf[Parameters])
+        .newInstance(params)
+        .asInstanceOf[Module]
+
+    Driver.elaborate(gen)
+  }
+
+Later, in GeneratorApp:
+lazy val circuit = elaborate(names, params)     (util/GeneratorUtils.scala)
+
+  val longName: String // Exhaustive name used to interface with external build tool targets
+
+  /** Output FIRRTL, which an external compiler can turn into Verilog. */
+  def generateFirrtl {
+    Driver.dumpFirrtl(circuit, Some(new File(td, s"$longName.fir"))) // FIRRTL
+  }

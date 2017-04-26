@@ -19,7 +19,7 @@ class HastiROM(contents: Seq[Byte])(implicit p: Parameters) extends HastiModule(
   val ren = io.hsel && (io.htrans === HTRANS_NONSEQ || io.htrans === HTRANS_SEQ)
   val rdata = Reg(UInt(width = 32))
   
-  rdata := rom(raddr).toBits
+  rdata := rom(raddr).asUInt()
 
   io.hrdata := rdata
   io.hready := Bool(true)

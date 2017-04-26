@@ -47,9 +47,9 @@ class HastiSRAM(depth: Int)(implicit p: Parameters) extends HastiModule()(p) {
     }
   }
 
-  val rdata = ram.read(raddr, ren).toBits
+  val rdata = ram.read(raddr, ren).asUInt()
   val rmask = FillInterleaved(8, wmask & Fill(hastiDataBits / 8, bypass))
-  io.hrdata := (wdata.toBits & rmask) | (rdata & ~rmask)
+  io.hrdata := (wdata.asUInt() & rmask) | (rdata & ~rmask)
 
   io.hready := Bool(true)
   io.hresp := HRESP_OKAY
