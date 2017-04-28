@@ -146,6 +146,7 @@ module zscale_wrapper #(
     .VERBOSE  (VERBOSE)
   ) mem (
     .clk                    (clk                    ),
+    .reset                  (resetn                 ),
     
     .io_mem_imem_htrans     (io_mem_imem_htrans     ),
     .io_mem_imem_hmastlock  (io_mem_imem_hmastlock  ),
@@ -249,7 +250,8 @@ module ahb_memory #(
   parameter VERBOSE = 0,
   parameter XLen = 64
 ) (
-  input           clk,
+  input               clk,
+  input               reset,
   input  [1:0]        io_mem_imem_htrans,
   input               io_mem_imem_hmastlock,
   input  [63:0]       io_mem_imem_haddr,
@@ -425,14 +427,14 @@ module ahb_memory #(
     w_en = 0;
   end endtask
   
-  always @(posedge clk) begin
+  always @(posedge clk) begin if(reset) begin
     io_mem_imem_hready <= 1'b1;
     io_mem_dmem_hready <= 1'b1;
     io_mem_imem_hresp  <= 0;  // Always OK
     io_mem_dmem_hresp  <= 0;  // Always OK
 
     // request, TODO: only works with NONSEQ
-    if (io_mem_imem_htrans == 2'b00 && io_mem_imem_hready /*&& io_mem_imem_hsel*/) begin
+    if (io_mem_imem_htrans != 2'b00 && io_mem_imem_hready /*&& io_mem_imem_hsel*/) begin
       if(io_mem_imem_htrans != 2'b10) begin
         $display("This simulation is incompatible with other different that NONSEQ");
         $finish;
@@ -442,7 +444,7 @@ module ahb_memory #(
     end
     
     // request, TODO: only works with NONSEQ
-    if (io_mem_dmem_htrans == 2'b00 && io_mem_dmem_hready /*&& io_mem_dmem_hsel*/) begin
+    if (io_mem_dmem_htrans != 2'b00 && io_mem_dmem_hready /*&& io_mem_dmem_hsel*/) begin
       if(io_mem_dmem_htrans != 2'b10) begin
         $display("This simulation is incompatible with other different that NONSEQ");
         $finish;
@@ -455,5 +457,5 @@ module ahb_memory #(
     if (latched_i_w_en && !delay_ahb_transaction[1]) handle_ahb_write(latched_i_waddr, latched_i_wdata, latched_i_wstrb, io_mem_imem_hready, latched_i_w_en);
     if (latched_d_r_en && !delay_ahb_transaction[2]) handle_ahb_read(latched_d_raddr, latched_d_rinsn, io_mem_dmem_hready, latched_d_r_en, io_mem_dmem_hrdata);
     if (latched_d_w_en && !delay_ahb_transaction[3]) handle_ahb_write(latched_d_waddr, latched_d_wdata, latched_d_wstrb, io_mem_dmem_hready, latched_d_w_en);
-  end
+  end end
 endmodule

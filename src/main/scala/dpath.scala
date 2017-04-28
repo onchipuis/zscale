@@ -32,7 +32,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
     //val prci = new PRCITileIO().flip
   }
 
-  val pc = Reg(init = UInt("h1000", xLen))
+  val pc = Reg(init = UInt("h0000", xLen))
   val id_br_target = Wire(UInt())
   val csr = Module(new rocket.CSRFile()( p.alterPartial({
       case TileKey => CSRALUTileParams()
