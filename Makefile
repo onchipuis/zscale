@@ -24,6 +24,9 @@ generated_dir = $(abspath ./target/generated-src)
 base_dir = $(abspath .)
 firrtl = $(generated_dir)/$(long_name).fir
 verilog = $(generated_dir)/$(long_name).v
+src_path := src/main/scala
+default_submodules := . rocket-chip rocket-chip/hardfloat rocket-chip/chisel3
+chisel_srcs := $(foreach submodule,$(default_submodules),$(shell find $(base_dir)/$(submodule)/$(src_path) -name "*.scala"))
 SBT ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -jar $(base_dir)/rocket-chip/sbt-launch.jar
 
 # Makefile rules

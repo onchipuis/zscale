@@ -85,6 +85,25 @@ class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {
     val dmem_stall = Bool(OUTPUT)
     val mul_stall = Bool(OUTPUT)
   }
+  
+  // FIX: We are going to replicate this ports and letting
+  // Control to handle all memory
+  // TODO: Maybe use HastiMasterIO
+  val repmem = new Bundle {
+    val imem = new Bundle {
+      val haddr =  Bits(INPUT, xLen)
+      val hready = Bool(OUTPUT)
+      val hrdata = Bits(OUTPUT, xLen)
+    }
+    val dmem = new Bundle {
+      val haddr =  Bits(INPUT, xLen)
+      val hwrite = Bool(INPUT)
+      val hsize =  Bits(INPUT, 3)
+      val hwdata = Bits(INPUT, xLen)
+      val hready = Bool(OUTPUT)
+      val hrdata = Bits(OUTPUT, xLen)
+    }
+  }
 }
 
 class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeConstants*/ {
@@ -95,6 +114,18 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
     //val dmem = new HastiMasterIO
     //val prci = new PRCITileIO().flip
   }
+  
+  // FIX: From datapath
+  io.mem.imem.haddr := io.dpath.repmem.imem.haddr;
+  io.dpath.repmem.imem.hready := io.mem.imem.hready;
+  io.dpath.repmem.imem.hrdata := io.mem.imem.hrdata;
+  io.mem.dmem.haddr := io.dpath.repmem.dmem.haddr;
+  io.mem.dmem.hwrite := io.dpath.repmem.dmem.hwrite;
+  io.mem.dmem.hsize := io.dpath.repmem.dmem.hsize;
+  io.mem.dmem.hwdata := io.dpath.repmem.dmem.hwdata;
+  io.dpath.repmem.dmem.hready := io.mem.dmem.hready;
+  io.dpath.repmem.dmem.hrdata := io.mem.dmem.hrdata;
+  // END FIX
 
   io.mem.imem.hwrite := Bool(false)
   io.mem.imem.hsize := UInt("b010")

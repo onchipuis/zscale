@@ -39,10 +39,11 @@ class Zscale(resetSignal: Bool = null)(implicit val p: Parameters) extends Modul
   val ctrl = Module(new Control)
   val dpath = Module(new Datapath)
 
+  // FIX: Those bulk connections are incompatible
   io.mem.imem <> ctrl.io.mem.imem
-  io.mem.imem <> dpath.io.mem.imem
+  //io.mem.imem <> dpath.io.mem.imem
   io.mem.dmem <> ctrl.io.mem.dmem
-  io.mem.dmem <> dpath.io.mem.dmem
+  //io.mem.dmem <> dpath.io.mem.dmem
   dpath.io.ctrl <> ctrl.io.dpath
 
   //ctrl.io.prci <> io.prci

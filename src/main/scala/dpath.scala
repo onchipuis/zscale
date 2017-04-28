@@ -25,7 +25,8 @@ case class CSRALUTileParams(implicit p: Parameters) extends TileParams {
 class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val io = new Bundle {
     val ctrl = new CtrlDpathIO().flip
-    val mem = new MemIO
+    // FIX: Just replace "io.ctrl.repmem" to "io.mem" in this file
+    //val mem = new MemIO 
     //val imem = new HastiMasterIO
     //val dmem = new HastiMasterIO
     //val prci = new PRCITileIO().flip
@@ -46,7 +47,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
     pc := npc
   }
 
-  io.mem.imem.haddr := Mux(io.ctrl.stallf, pc, npc)
+  io.ctrl.repmem.imem.haddr := Mux(io.ctrl.stallf, pc, npc)
 
   val id_pc = Reg(UInt(width = xLen))
   val id_inst = Reg(Bits(width = coreInstBits))
@@ -58,7 +59,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   // !io.ctrl.killf is a power optimization (clock-gating)
   when (!io.ctrl.stalldx && !io.ctrl.killf) {
     id_pc := pc
-    id_inst := io.mem.imem.hrdata
+    id_inst := io.ctrl.repmem.imem.hrdata
   }
 
   val rf = new RegFile(if (haveEExt) 15 else 31, 32, true)
@@ -106,14 +107,14 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val dmem_load_lowaddr = RegEnable(dmem_req_addr(1, 0), io.ctrl.id.mem_valid && !io.ctrl.id.mem_rw)
   when (io.ctrl.id.mem_valid && io.ctrl.id.mem_rw) { wb_wdata := dmem_sgen.data } // share wb_wdata with store data
 
-  io.mem.dmem.haddr := dmem_req_addr
-  io.mem.dmem.hwrite := io.ctrl.id.mem_rw
-  io.mem.dmem.hsize := dmem_sgen.size
-  io.mem.dmem.hwdata := wb_wdata
+  io.ctrl.repmem.dmem.haddr := dmem_req_addr
+  io.ctrl.repmem.dmem.hwrite := io.ctrl.id.mem_rw
+  io.ctrl.repmem.dmem.hsize := dmem_sgen.size
+  io.ctrl.repmem.dmem.hwdata := wb_wdata
 
-  val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.mem.dmem.hready
+  val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.ctrl.repmem.dmem.hready
   val dmem_resp_valid = dmem_clear_sb && !io.ctrl.ll.mem_rw
-  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.mem.dmem.hrdata, Bool(false), 4)
+  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.ctrl.repmem.dmem.hrdata, Bool(false), 4)
 
   // MUL/DIV
   val (mulDivRespValid, mulDivRespData, mulDivReqReady) = if (haveMExt) {
@@ -176,7 +177,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   //printf("Z%d: %d [%d] [%s%s%s%s%s%s|%s%s%s%s] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
   printf("Z%d: %d [%d] [%x%x%x%x%x%x|%x%x%x%x] pc=[%x] W[r%d=%x][%d] R[r%d=%x] R[r%d=%x] [%d|%x] inst=[%x] DASM(%x)\n",
     csr.io.hartid, csr.io.time(31, 0), !io.ctrl.killdx,
-    Reg(init=45,next=Mux(!io.mem.imem.hready, 73, 45)), // I -
+    Reg(init=45,next=Mux(!io.ctrl.repmem.imem.hready, 73, 45)), // I -
     Reg(init=45,next=Mux(io.ctrl.id.br && io.ctrl.br_taken, 66, 45)), // B -
     Reg(init=45,next=Mux(io.ctrl.id.j, 74, 45)), // J -
     Reg(init=45,next=Mux(io.ctrl.logging.invalidate, 86, 45)), // V -
