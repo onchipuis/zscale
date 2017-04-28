@@ -5,16 +5,32 @@
 `ifndef VERILATOR
 // Simple placeholder
 module TestHarness_tb #(
+`ifndef AHBTEST
   parameter AHB_TEST = 0,
+`else
+  parameter AHB_TEST = 1,
+`endif
+`ifndef VERB
   parameter VERBOSE = 0,
+`else
+  parameter VERBOSE = 1,
+`endif
   parameter XLen = 64
 );
 testbench #(AHB_TEST, VERBOSE, XLen) tb ();
 endmodule
 
 module TestHarness #(
+`ifndef AHBTEST
   parameter AHB_TEST = 0,
+`else
+  parameter AHB_TEST = 1,
+`endif
+`ifndef VERB
   parameter VERBOSE = 0,
+`else
+  parameter VERBOSE = 1,
+`endif
   parameter XLen = 64
 );
 testbench #(AHB_TEST, VERBOSE, XLen) tb ();
@@ -203,7 +219,7 @@ module zscale_wrapper #(
   reg [1023:0] firmware_file;
   initial begin
     if (!$value$plusargs("firmware=%s", firmware_file))
-      firmware_file = "firmware/firmware.hex";
+      firmware_file = "firmware.hex";
     $readmemh(firmware_file, mem.memory);
   end
 
