@@ -9,8 +9,6 @@
 # NOTE: for fast testing, use (with sbt):
 # run-main zscale.Generator ./target/generated-src zscale ExampleTopZscale zscale DefaultConfig
 
-SBT := sbt
-
 # Variables
 #TODO: change me: TestHarness
 MODEL ?= ExampleTopZscale
@@ -26,6 +24,7 @@ generated_dir = $(abspath ./target/generated-src)
 base_dir = $(abspath .)
 firrtl = $(generated_dir)/$(long_name).fir
 verilog = $(generated_dir)/$(long_name).v
+SBT ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -jar $(base_dir)/sbt-launch.jar
 
 # Makefile rules
 .SECONDARY: $(firrtl) $(verilog)
