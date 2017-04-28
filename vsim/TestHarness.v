@@ -158,7 +158,7 @@ module zscale_wrapper #(
     .tests_passed           (tests_passed           )
   );
 
-  ExampleTopZscale(
+  ExampleTopZscale uut(
     .clock                  (clk                    ),
     .reset                  (~resetn                ),
     
