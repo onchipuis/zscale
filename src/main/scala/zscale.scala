@@ -43,7 +43,7 @@ class Zscale(resetSignal: Bool = null)(implicit val p: Parameters) extends Modul
   io.mem.imem <> dpath.io.mem.imem
   io.mem.dmem <> ctrl.io.mem.dmem
   io.mem.dmem <> dpath.io.mem.dmem
-  ctrl.io.dpath <> dpath.io.ctrl
+  dpath.io.ctrl <> ctrl.io.dpath
 
   //ctrl.io.prci <> io.prci
   //dpath.io.prci <> io.prci

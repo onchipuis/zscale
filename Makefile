@@ -12,7 +12,8 @@
 SBT := sbt
 
 # Variables
-MODEL ?= TestHarness
+#TODO: change me: TestHarness
+MODEL ?= ExampleTopZscale
 PROJECT ?= zscale
 CFG_PROJECT ?= $(PROJECT)
 CONFIG ?= DefaultConfig
@@ -22,6 +23,7 @@ FIRRTL ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -cp $(FIRRTL_JAR) firrtl.Drive
 # Constants
 long_name = $(PROJECT).$(CONFIG)
 generated_dir = $(abspath ./target/generated-src)
+base_dir = $(abspath .)
 firrtl = $(generated_dir)/$(long_name).fir
 verilog = $(generated_dir)/$(long_name).v
 
