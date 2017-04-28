@@ -3,6 +3,24 @@
 `timescale 1 ns / 1 ps
 
 `ifndef VERILATOR
+// Simple placeholder
+module TestHarness_tb #(
+  parameter AHB_TEST = 0,
+  parameter VERBOSE = 0,
+  parameter XLen = 64
+);
+testbench #(AHB_TEST, VERBOSE, XLen) tb ();
+endmodule
+
+module TestHarness #(
+  parameter AHB_TEST = 0,
+  parameter VERBOSE = 0,
+  parameter XLen = 64
+);
+testbench #(AHB_TEST, VERBOSE, XLen) tb ();
+endmodule
+
+
 module testbench #(
   parameter AHB_TEST = 0,
   parameter VERBOSE = 0,
@@ -278,7 +296,7 @@ module ahb_memory #(
   reg [XLen-1:0]   latched_i_raddr;
   reg [XLen-1:0]   latched_i_waddr;
   reg [XLen-1:0]   latched_i_wdata;
-  reg [Xlen/8-1:0] latched_i_wstrb;
+  reg [XLen/8-1:0] latched_i_wstrb;
   reg              latched_i_rinsn;
   
   reg latched_d_r_en = 0;
@@ -286,7 +304,7 @@ module ahb_memory #(
   reg [XLen-1:0]   latched_d_raddr;
   reg [XLen-1:0]   latched_d_waddr;
   reg [XLen-1:0]   latched_d_wdata;
-  reg [Xlen/8-1:0] latched_d_wstrb;
+  reg [XLen/8-1:0] latched_d_wstrb;
   reg              latched_d_rinsn;
   
   // Task for handling hready
@@ -300,7 +318,7 @@ module ahb_memory #(
   output [XLen-1:0]   raddr;
   output [XLen-1:0]   waddr;
   output [XLen-1:0]   wdata;
-  output [Xlen/8-1:0] wstrb;
+  output [XLen/8-1:0] wstrb;
   output              rinsn;
   output              r_en;
   output              w_en;
@@ -313,10 +331,10 @@ module ahb_memory #(
     w_en =  hwrite;
     hready <= 0;
     case (size)
-      3'd0:     wstrb = {XLen/8-1{1'b0}, 1{1'b1}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
-      3'd1:     wstrb = {XLen/8-2{1'b0}, 2{1'b1}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
-      3'd2:     wstrb = {XLen/8-4{1'b0}, 4{1'b1}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
-      default:  wstrb = {XLen/8{1'b1}}            << (XLen == 64? waddr[2:0] : waddr[1:0]);
+      3'd0:     wstrb = {{(XLen/8-1){1'b0}}, {1{1'b1}}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
+      3'd1:     wstrb = {{(XLen/8-2){1'b0}}, {2{1'b1}}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
+      3'd2:     wstrb = {{(XLen/8-4){1'b0}}, {4{1'b1}}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
+      default:  wstrb = {(XLen/8){1'b1}}              << (XLen == 64? waddr[2:0] : waddr[1:0]);
     endcase
   end endtask
   
@@ -330,10 +348,10 @@ module ahb_memory #(
   begin
     if (verbose)
       $display("RD: ADDR=%08x DATA=%08x%s",raddr, memory[raddr >> 2], rinsn ? " INSN" : "");
-    if (latched_raddr < 64*1024) begin
-      rdata <= memory[latched_raddr >> 2];
+    if (raddr < 64*1024) begin
+      rdata <= memory[raddr >> 2];
       hready <= 1;
-      rdata = 0;
+      r_en = 0;
     end else begin
       $display("OUT-OF-BOUNDS MEMORY READ FROM %08x", raddr);
       $finish;
@@ -344,7 +362,7 @@ module ahb_memory #(
   task handle_ahb_write; 
   input  [XLen-1:0]   waddr;
   input  [XLen-1:0]   wdata;
-  input  [Xlen/8-1:0] wstrb;
+  input  [XLen/8-1:0] wstrb;
   output              hready;
   output              w_en;
   begin
@@ -387,7 +405,7 @@ module ahb_memory #(
       $display("OUT-OF-BOUNDS MEMORY WRITE TO %08x", waddr);
       $finish;
     end
-    hready <= 1
+    hready <= 1;
     w_en = 0;
   end endtask
   
@@ -417,9 +435,9 @@ module ahb_memory #(
         latched_d_raddr, latched_d_waddr, latched_d_wdata, latched_d_wstrb, latched_d_rinsn, latched_d_r_en, latched_d_w_en);
     end
 
-    if (latched_i_r_en && !delay_ahb_transaction[0]) handle_ahb_read(latched_i_raddr, latched_i_rinsn, io_mem_imem_hready, latched_i_r_en, latched_i_rdata);
+    if (latched_i_r_en && !delay_ahb_transaction[0]) handle_ahb_read(latched_i_raddr, latched_i_rinsn, io_mem_imem_hready, latched_i_r_en, io_mem_imem_hrdata);
     if (latched_i_w_en && !delay_ahb_transaction[1]) handle_ahb_write(latched_i_waddr, latched_i_wdata, latched_i_wstrb, io_mem_imem_hready, latched_i_w_en);
-    if (latched_d_r_en && !delay_ahb_transaction[2]) handle_ahb_read(latched_d_raddr, latched_d_rinsn, io_mem_dmem_hready, latched_d_r_en, latched_d_rdata);
+    if (latched_d_r_en && !delay_ahb_transaction[2]) handle_ahb_read(latched_d_raddr, latched_d_rinsn, io_mem_dmem_hready, latched_d_r_en, io_mem_dmem_hrdata);
     if (latched_d_w_en && !delay_ahb_transaction[3]) handle_ahb_write(latched_d_waddr, latched_d_wdata, latched_d_wstrb, io_mem_dmem_hready, latched_d_w_en);
   end
 endmodule
