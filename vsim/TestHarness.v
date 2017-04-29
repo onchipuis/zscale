@@ -15,7 +15,11 @@ module TestHarness_tb #(
 `else
   parameter VERBOSE = 1,
 `endif
-  parameter XLen = 64
+`ifndef XLEN
+  parameter XLen = 32
+`else
+  parameter XLen = XLEN
+`endif
 );
 testbench #(AHB_TEST, VERBOSE, XLen) tb ();
 endmodule
@@ -31,7 +35,7 @@ module TestHarness #(
 `else
   parameter VERBOSE = 1,
 `endif
-  parameter XLen = 64
+  parameter XLen = 32
 );
 testbench #(AHB_TEST, VERBOSE, XLen) tb ();
 endmodule
@@ -40,7 +44,7 @@ endmodule
 module testbench #(
   parameter AHB_TEST = 0,
   parameter VERBOSE = 0,
-  parameter XLen = 64
+  parameter XLen = 32
 );
   reg clk = 1;
   reg resetn = 0;
@@ -86,7 +90,8 @@ module testbench #(
 
   zscale_wrapper #(
     .AHB_TEST (AHB_TEST),
-    .VERBOSE  (VERBOSE)
+    .VERBOSE  (VERBOSE),
+    .XLen (XLen)
   ) top (
     .clk(clk),
     .resetn(resetn),
@@ -99,7 +104,8 @@ endmodule
 
 module zscale_wrapper #(
   parameter AHB_TEST = 0,
-  parameter VERBOSE = 0
+  parameter VERBOSE = 0,
+  parameter XLen = 32
 ) (
   input clk,
   input resetn,
@@ -120,30 +126,31 @@ module zscale_wrapper #(
   // Memory <> Zscale
   wire [1:0]  io_mem_imem_htrans;
   wire        io_mem_imem_hmastlock;
-  wire [63:0] io_mem_imem_haddr;
+  wire [XLen-1:0] io_mem_imem_haddr;
   wire        io_mem_imem_hwrite;
   wire [2:0]  io_mem_imem_hburst;
   wire [2:0]  io_mem_imem_hsize;
   wire [3:0]  io_mem_imem_hprot;
-  wire [63:0] io_mem_imem_hwdata;
-  wire [63:0] io_mem_imem_hrdata;
+  wire [XLen-1:0] io_mem_imem_hwdata;
+  wire [XLen-1:0] io_mem_imem_hrdata;
   wire        io_mem_imem_hready;
   wire        io_mem_imem_hresp;
   wire [1:0]  io_mem_dmem_htrans;
   wire        io_mem_dmem_hmastlock;
-  wire [63:0] io_mem_dmem_haddr;
+  wire [XLen-1:0] io_mem_dmem_haddr;
   wire        io_mem_dmem_hwrite;
   wire [2:0]  io_mem_dmem_hburst;
   wire [2:0]  io_mem_dmem_hsize;
   wire [3:0]  io_mem_dmem_hprot;
-  wire [63:0] io_mem_dmem_hwdata;
-  wire [63:0] io_mem_dmem_hrdata;
+  wire [XLen-1:0] io_mem_dmem_hwdata;
+  wire [XLen-1:0] io_mem_dmem_hrdata;
   wire        io_mem_dmem_hready;
   wire        io_mem_dmem_hresp;
 
   ahb_memory #(
     .AHB_TEST (AHB_TEST),
-    .VERBOSE  (VERBOSE)
+    .VERBOSE  (VERBOSE),
+    .XLen (XLen)
   ) mem (
     .clk                    (clk                    ),
     .reset                  (resetn                 ),
@@ -218,15 +225,32 @@ module zscale_wrapper #(
   assign trace_data  = 0;
 
   reg [1023:0] firmware_file;
+  integer k;
+  
   initial begin
+    if(XLen != 64 && XLen != 32) begin
+      $display("UNSUPPORTED XLen");
+      $finish;
+    end
     if (!$value$plusargs("firmware=%s", firmware_file))
       firmware_file = "firmware.hex";
     $readmemh(firmware_file, mem.memory);
+    // If xlen is 64, need to transform memory
+    if(XLen == 64) begin
+      for(k = 0; k < (64*1024/4/2); k=k+1) begin
+        mem.memory[k][31:0] = mem.memory[k*2][31:0];
+        mem.memory[k][63:32] = mem.memory[k*2+1][31:0];
+      end
+    end
   end
 
   integer cycle_counter;
   always @(posedge clk) begin
     cycle_counter <= resetn ? cycle_counter + 1 : 0;
+    if (tests_passed) begin
+      $display("ALL TESTS PASSED.");
+      $finish;
+    end
     if (resetn && trap) begin
 `ifndef VERILATOR
       repeat (10) @(posedge clk);
@@ -248,31 +272,31 @@ endmodule
 module ahb_memory #(
   parameter AHB_TEST = 0,
   parameter VERBOSE = 0,
-  parameter XLen = 64
+  parameter XLen = 32
 ) (
   input               clk,
   input               reset,
   input  [1:0]        io_mem_imem_htrans,
   input               io_mem_imem_hmastlock,
-  input  [63:0]       io_mem_imem_haddr,
+  input  [XLen-1:0]       io_mem_imem_haddr,
   input               io_mem_imem_hwrite,
   input  [2:0]        io_mem_imem_hburst,
   input  [2:0]        io_mem_imem_hsize,
   input  [3:0]        io_mem_imem_hprot,
-  input  [63:0]       io_mem_imem_hwdata,
-  output reg [63:0]   io_mem_imem_hrdata,
+  input  [XLen-1:0]       io_mem_imem_hwdata,
+  output reg [XLen-1:0]   io_mem_imem_hrdata,
   output reg          io_mem_imem_hready,
   output reg          io_mem_imem_hresp,
   
   input  [1:0]        io_mem_dmem_htrans,
   input               io_mem_dmem_hmastlock,
-  input  [63:0]       io_mem_dmem_haddr,
+  input  [XLen-1:0]       io_mem_dmem_haddr,
   input               io_mem_dmem_hwrite,
   input  [2:0]        io_mem_dmem_hburst,
   input  [2:0]        io_mem_dmem_hsize,
   input  [3:0]        io_mem_dmem_hprot,
-  input  [63:0]       io_mem_dmem_hwdata,
-  output reg [63:0]   io_mem_dmem_hrdata,
+  input  [XLen-1:0]       io_mem_dmem_hwdata,
+  output reg [XLen-1:0]   io_mem_dmem_hrdata,
   output reg          io_mem_dmem_hready,
   output reg          io_mem_dmem_hresp,
 
@@ -364,14 +388,18 @@ module ahb_memory #(
   output              r_en;
   output [XLen-1:0]   rdata;
   begin
-    if (verbose)
-      $display("RD: ADDR=%08x DATA=%08x%s",raddr, memory[raddr >> 2], rinsn ? " INSN" : "");
     if (raddr < 64*1024) begin
-      rdata = memory[raddr >> 2];
+      if(XLen == 64) begin
+        rdata = memory[raddr >> 3];
+      end else begin
+        rdata = memory[raddr >> 2];
+      end
+      if (verbose)
+        $display("RD: ADDR=%x DATA=%x%s",raddr, rdata, rinsn ? " INSN" : "");
       hready = 1;
       r_en = 0;
     end else begin
-      $display("OUT-OF-BOUNDS MEMORY READ FROM %08x", raddr);
+      $display("OUT-OF-BOUNDS MEMORY READ FROM %x", raddr);
       $finish;
     end
   end endtask
@@ -383,25 +411,28 @@ module ahb_memory #(
   input  [XLen/8-1:0] wstrb;
   output              hready;
   output              w_en;
+  reg [XLen-1:0] wrdata;
   begin
-    if (verbose)
-      $display("WR: ADDR=%08x DATA=%08x STRB=%04b", waddr, wdata, wstrb);
     if (waddr < 64*1024) begin
       if(XLen == 64) begin
-        if (wstrb[0]) memory[waddr >> 3][ 7: 0] <= wdata[ 7: 0];
-        if (wstrb[1]) memory[waddr >> 3][15: 8] <= wdata[15: 8];
-        if (wstrb[2]) memory[waddr >> 3][23:16] <= wdata[23:16];
-        if (wstrb[3]) memory[waddr >> 3][31:24] <= wdata[31:24];
-        if (wstrb[4]) memory[waddr >> 3][39:32] <= wdata[39:32];
-        if (wstrb[5]) memory[waddr >> 3][47:40] <= wdata[47:40];
-        if (wstrb[6]) memory[waddr >> 3][55:48] <= wdata[55:48];
-        if (wstrb[7]) memory[waddr >> 3][63:56] <= wdata[63:56];
+        wrdata = wdata << ((waddr & 'h7) << 3);
+        if (wstrb[0]) memory[waddr >> 3][ 7: 0] <= wrdata[ 7: 0];
+        if (wstrb[1]) memory[waddr >> 3][15: 8] <= wrdata[15: 8];
+        if (wstrb[2]) memory[waddr >> 3][23:16] <= wrdata[23:16];
+        if (wstrb[3]) memory[waddr >> 3][31:24] <= wrdata[31:24];
+        if (wstrb[4]) memory[waddr >> 3][39:32] <= wrdata[39:32];
+        if (wstrb[5]) memory[waddr >> 3][47:40] <= wrdata[47:40];
+        if (wstrb[6]) memory[waddr >> 3][55:48] <= wrdata[55:48];
+        if (wstrb[7]) memory[waddr >> 3][63:56] <= wrdata[63:56];
       end else begin
-        if (wstrb[0]) memory[waddr >> 2][ 7: 0] <= wdata[ 7: 0];
-        if (wstrb[1]) memory[waddr >> 2][15: 8] <= wdata[15: 8];
-        if (wstrb[2]) memory[waddr >> 2][23:16] <= wdata[23:16];
-        if (wstrb[3]) memory[waddr >> 2][31:24] <= wdata[31:24];
+        wrdata = wdata << ((waddr & 'h3) << 3);
+        if (wstrb[0]) memory[waddr >> 2][ 7: 0] <= wrdata[ 7: 0];
+        if (wstrb[1]) memory[waddr >> 2][15: 8] <= wrdata[15: 8];
+        if (wstrb[2]) memory[waddr >> 2][23:16] <= wrdata[23:16];
+        if (wstrb[3]) memory[waddr >> 2][31:24] <= wrdata[31:24];
       end
+      if (verbose)
+        $display("WR: ADDR=%x DATA=%x STRB=%b", waddr, wrdata, wstrb);
     end else
     if (waddr == (XLen == 64? 64'h1000_0000:32'h1000_0000)) begin
       if (verbose) begin
@@ -411,6 +442,7 @@ module ahb_memory #(
           $display("OUT: %3d", wdata);
       end else begin
         $write("%c", wdata[7:0]);
+        //$display("OUT: '%c' %3d", wdata[7:0], wdata[7:0]);
 `ifndef VERILATOR
         $fflush();
 `endif
@@ -420,7 +452,7 @@ module ahb_memory #(
       if (wdata == 123456789)
         tests_passed = 1;
     end else begin
-      $display("OUT-OF-BOUNDS MEMORY WRITE TO %08x", waddr);
+      $display("OUT-OF-BOUNDS MEMORY WRITE TO %x", waddr);
       $finish;
     end
     hready = 1;
@@ -451,7 +483,7 @@ module ahb_memory #(
         $display("This simulation is incompatible with other different that NONSEQ");
         $finish;
       end
-      handle_ahb_request(io_mem_dmem_hsize, io_mem_dmem_haddr, io_mem_dmem_hwdata, 1, io_mem_dmem_hwrite, io_mem_dmem_hready, 
+      handle_ahb_request(io_mem_dmem_hsize, io_mem_dmem_haddr, io_mem_dmem_hwdata, 0, io_mem_dmem_hwrite, io_mem_dmem_hready, 
         latched_d_raddr, latched_d_waddr, latched_d_wdata, latched_d_wstrb, latched_d_rinsn, latched_d_r_en, latched_d_w_en);
     end
 

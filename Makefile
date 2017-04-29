@@ -14,7 +14,7 @@
 MODEL ?= ExampleTopZscale
 PROJECT ?= zscale
 CFG_PROJECT ?= $(PROJECT)
-CONFIG ?= DefaultConfig
+CONFIG ?= TinyConfig
 FIRRTL_JAR ?= rocket-chip/firrtl/utils/bin/firrtl.jar
 FIRRTL ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -cp $(FIRRTL_JAR) firrtl.Driver
 

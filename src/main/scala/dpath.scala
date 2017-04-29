@@ -62,12 +62,23 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
   val wb_wdata = Reg(Bits())
 
   // !io.ctrl.killf is a power optimization (clock-gating)
-  when (!io.ctrl.stalldx && !io.ctrl.killf) {
-    id_pc := pc
-    id_inst := io.ctrl.repmem.imem.hrdata
+  
+  if(xLen == 64)
+  {
+    when (!io.ctrl.stalldx && !io.ctrl.killf) {
+      id_pc := pc
+      id_inst := Mux(pc(2), io.ctrl.repmem.imem.hrdata(63, 32), io.ctrl.repmem.imem.hrdata) 
+    }
+  }
+  else
+  {
+    when (!io.ctrl.stalldx && !io.ctrl.killf) {
+      id_pc := pc
+      id_inst := io.ctrl.repmem.imem.hrdata
+    }
   }
 
-  val rf = new RegFile(if (haveEExt) 15 else 31, 32, true)
+  val rf = new RegFile(if (haveEExt) 15 else 31, xLen, true)
   val id_addr = Vec(id_inst(19, 15), id_inst(24,20))
   val id_rs = id_addr.map(rf.read _)
   val id_rd = id_inst(11, 7)
@@ -79,6 +90,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
     })
   ))
   alu.io.fn := io.ctrl.id.fn_alu
+  alu.io.dw := io.ctrl.id.dw_alu
   alu.io.in1 := MuxLookup(io.ctrl.id.sel_alu1, SInt(0), Seq(
       A1_RS1 -> id_rs(0).asSInt,
       A1_PC -> id_pc.asSInt
@@ -134,18 +146,19 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
 
   // DMEM
   val dmem_req_addr = alu.io.adder_out
-  val dmem_sgen = new StoreGen(io.ctrl.id.mem_type, dmem_req_addr, id_rs(1), 4)
-  val dmem_load_lowaddr = RegEnable(dmem_req_addr(1, 0), io.ctrl.id.mem_valid && !io.ctrl.id.mem_rw)
+  val dmem_sgen = new StoreGen(io.ctrl.id.mem_type, dmem_req_addr, id_rs(1), xLen/8)
+  val dmem_load_lowaddr = if(xLen == 64) RegEnable(dmem_req_addr(2, 0), io.ctrl.id.mem_valid && !io.ctrl.id.mem_rw)
+                          else RegEnable(dmem_req_addr(1, 0), io.ctrl.id.mem_valid && !io.ctrl.id.mem_rw)
   when (io.ctrl.id.mem_valid && io.ctrl.id.mem_rw) { wb_wdata := dmem_sgen.data } // share wb_wdata with store data
 
   io.ctrl.repmem.dmem.haddr := dmem_req_addr
   io.ctrl.repmem.dmem.hwrite := io.ctrl.id.mem_rw
   io.ctrl.repmem.dmem.hsize := dmem_sgen.size
-  io.ctrl.repmem.dmem.hwdata := wb_wdata
+  io.ctrl.repmem.dmem.hwdata := dmem_sgen.data
 
   val dmem_clear_sb = io.ctrl.ll.valid && !io.ctrl.ll.fn && io.ctrl.repmem.dmem.hready
   val dmem_resp_valid = dmem_clear_sb && !io.ctrl.ll.mem_rw
-  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.ctrl.repmem.dmem.hrdata, Bool(false), 4)
+  val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, mtSigned(io.ctrl.ll.mem_type), dmem_load_lowaddr, io.ctrl.repmem.dmem.hrdata, Bool(false), xLen/8)
 
   // MUL/DIV
   val (mulDivRespValid : Bool, mulDivRespData : UInt, mulDivReqReady : Bool) = if (haveMExt) {
@@ -196,7 +209,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
   io.ctrl.inst := id_inst
   io.ctrl.ma_pc := pc(1)
   io.ctrl.ma_addr := dmem_sgen.misaligned
-  io.ctrl.br_taken := alu.io.out(0)
+  io.ctrl.br_taken := alu.io.cmp_out      //alu.io.out(0)
   io.ctrl.mul_ready := mulDivReqReady
   io.ctrl.clear_sb := dmem_clear_sb || mulDivRespValid
   //io.ctrl.csr_xcpt := csr.io.csr_xcpt // TODO: Exceptions from CSR?

@@ -57,7 +57,7 @@ class TinyConfig extends Config(
     case XLen => 32 
   case `useEExt` => false
   case `useCExt` => false
-  case `useMExt` => false
+  case `useMExt` => true
   case `FastMulDiv` => false
   }))
 
