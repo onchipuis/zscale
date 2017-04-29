@@ -254,19 +254,19 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   val imem_bus_error = io.mem.imem.hready && io.mem.imem.hresp === HRESP_ERROR
   val dmem_bus_error = io.mem.dmem.hready && io.mem.dmem.hresp === HRESP_ERROR
 
-  val (id_xcpt_nomem, id_cause_nomem) = checkExceptions(List(
+  val (id_xcpt_nomem : Bool, id_cause_nomem : UInt) = checkExceptions(List(
     (io.dpath.csr_interrupt, io.dpath.csr_interrupt_cause),
     (io.dpath.ma_pc, UInt(Causes.misaligned_fetch)),
     (imem_bus_error, UInt(Causes.fetch_access)),  // TODO: This was "fault_fetch"
     (!id_sb_stall && id_valid && !id_inst_valid, UInt(Causes.illegal_instruction)) 
     ))
 
-  val (id_xcpt, id_cause) = checkExceptions(List(
+  val (id_xcpt : Bool, id_cause : UInt) = checkExceptions(List(
     (id_xcpt_nomem, id_cause_nomem),
     (id_ok && id_mem_valid && !id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_load)),
-    (id_ok && id_mem_valid &&  id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_store))/*,
+    (id_ok && id_mem_valid &&  id_mem_rw && io.dpath.ma_addr, UInt(Causes.misaligned_store)),
     (dmem_bus_error && !ll_mem_rw, UInt(Causes.load_access)), // TODO: This was "fault_x"
-    (dmem_bus_error &&  ll_mem_rw, UInt(Causes.store_access)) */
+    (dmem_bus_error &&  ll_mem_rw, UInt(Causes.store_access)) 
     ))
 
   val id_retire_nomem_exclude_csr = id_ok && !id_xcpt_nomem

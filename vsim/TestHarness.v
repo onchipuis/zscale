@@ -347,7 +347,7 @@ module ahb_memory #(
     rinsn = hinsn;
     r_en = ~hwrite;
     w_en =  hwrite;
-    hready <= 0;
+    hready = 0;
     case (size)
       3'd0:     wstrb = {{(XLen/8-1){1'b0}}, {1{1'b1}}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
       3'd1:     wstrb = {{(XLen/8-2){1'b0}}, {2{1'b1}}} << (XLen == 64? waddr[2:0] : waddr[1:0]);
@@ -367,8 +367,8 @@ module ahb_memory #(
     if (verbose)
       $display("RD: ADDR=%08x DATA=%08x%s",raddr, memory[raddr >> 2], rinsn ? " INSN" : "");
     if (raddr < 64*1024) begin
-      rdata <= memory[raddr >> 2];
-      hready <= 1;
+      rdata = memory[raddr >> 2];
+      hready = 1;
       r_en = 0;
     end else begin
       $display("OUT-OF-BOUNDS MEMORY READ FROM %08x", raddr);
@@ -423,15 +423,17 @@ module ahb_memory #(
       $display("OUT-OF-BOUNDS MEMORY WRITE TO %08x", waddr);
       $finish;
     end
-    hready <= 1;
+    hready = 1;
     w_en = 0;
   end endtask
   
-  always @(posedge clk) begin if(reset) begin
-    io_mem_imem_hready <= 1'b1;
-    io_mem_dmem_hready <= 1'b1;
-    io_mem_imem_hresp  <= 0;  // Always OK
-    io_mem_dmem_hresp  <= 0;  // Always OK
+  always @(posedge clk) begin 
+  io_mem_imem_hready <= 1'b1;
+  io_mem_dmem_hready <= 1'b1;
+  io_mem_imem_hresp  <= 0;  // Always OK
+  io_mem_dmem_hresp  <= 0;  // Always OK
+  
+  if(reset) begin
 
     // request, TODO: only works with NONSEQ
     if (io_mem_imem_htrans != 2'b00 && io_mem_imem_hready /*&& io_mem_imem_hsel*/) begin

@@ -23,6 +23,7 @@ case object FastMulDiv extends Field[Boolean]
 case object useMExt extends Field[Boolean]
 case object useEExt extends Field[Boolean]
 case object useCExt extends Field[Boolean]
+case object zscaleID extends Field[Int]
 
 class BasePlatformConfig extends Config((site, here, up) => {
   // DTS descriptive parameters (TODO: Not used yet)
@@ -42,6 +43,7 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
   case `useCExt` => false
   case `useMExt` => true
   case `FastMulDiv` => true
+  case `zscaleID` => 12345
 })
 
 /** Actual elaboratable target Configs */

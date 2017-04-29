@@ -9,6 +9,7 @@ import junctions._
 import HastiConstants._
 import util.ParameterizedBundle // IMPORTANT: Before uncore.util
 import uncore._
+import constants._
 
 import tile.XLen 
 
@@ -22,6 +23,9 @@ trait HasZscaleParameters {
   val haveMExt = p(useMExt)
   val haveEExt = p(useEExt)
   val haveCExt = p(useCExt)
+  
+  // ID stuff
+  val hartID = p(zscaleID)
 }
 
 abstract class ZscaleModule(implicit val p: Parameters) extends Module

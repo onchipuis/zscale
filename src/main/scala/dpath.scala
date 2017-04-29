@@ -11,6 +11,7 @@ import rocket._
 import util._
 import ALU._
 import HastiConstants._
+import constants._
 import tile._
 
 // TODO: This class is only used for create our CSR/ALU
@@ -22,7 +23,9 @@ case class CSRALUTileParams(implicit p: Parameters) extends TileParams {
   val core = RocketCoreParams(nPMPs = 0) //TODO remove this
 }
 
-class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
+class Datapath(implicit p: Parameters) extends ZscaleModule()(p) 
+  with RISCVConstants
+  {
   val io = new Bundle {
     val ctrl = new CtrlDpathIO().flip
     // FIX: Just replace "io.ctrl.repmem" to "io.mem" in this file
@@ -34,9 +37,11 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
 
   val pc = Reg(init = UInt("h0000", xLen))
   val id_br_target = Wire(UInt())
+  // CSR
   val csr = Module(new rocket.CSRFile()( p.alterPartial({
       case TileKey => CSRALUTileParams()
     }) ))
+  
   val xcpt = io.ctrl.id.xcpt/* || io.ctrl.csr_xcpt*/  // TODO: Exceptions from CSR?
 
   val npc = (Mux(io.ctrl.id.j || io.ctrl.id.br && io.ctrl.br_taken, id_br_target,
@@ -49,8 +54,8 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
 
   io.ctrl.repmem.imem.haddr := Mux(io.ctrl.stallf, pc, npc)
 
-  val id_pc = Reg(UInt(width = xLen))
-  val id_inst = Reg(Bits(width = coreInstBits))
+  val id_pc = Reg(init = UInt("h0000", xLen))
+  val id_inst = Reg(init = BUBBLE)  // TODO: Why this register had no init?
 
   val wb_wen = Reg(init = Bool(false))
   val wb_waddr = Reg(UInt())
@@ -98,6 +103,32 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   csr.io.retire := !io.ctrl.killdx
   csr.io.cause := io.ctrl.id.cause
   csr.io.pc := id_pc
+  
+  csr.io.decode.csr := id_inst(31, 20)      // TODO: Stuff added because reasons
+  csr.io.badaddr := wb_wdata
+  csr.io.hartid := hartID;
+  csr.io.rocc_interrupt := Bool(false);     // No rocc_interrupt, actually IDK what is
+  
+  // TODO: All interrupts are here!
+  csr.io.interrupts.debug := Bool(false);
+  csr.io.interrupts.mtip := Bool(false);
+  csr.io.interrupts.msip := Bool(false);
+  csr.io.interrupts.meip := Bool(false);
+  //csr.io.interrupts.seip := Bool(false);  // Only if usingVM
+  //csr.io.interrupts.lip := Bool(false);   // This is a vector of number of tiles (local interrupts)
+  
+  
+  // From: rocket-chip/src/main/scala/rocket/Rocket.scala
+  /*def encodeVirtualAddress(a0: UInt, ea: UInt) = if (vaddrBitsExtended == vaddrBits) ea else {
+    // efficient means to compress 64-bit VA into vaddrBits+1 bits
+    // (VA is bad if VA(vaddrBits) != VA(vaddrBits-1))
+    val a = a0 >> vaddrBits-1
+    val e = ea(vaddrBits,vaddrBits-1).asSInt
+    val msb =
+      Mux(a === UInt(0) || a === UInt(1), e =/= SInt(0),
+      Mux(a.asSInt === SInt(-1) || a.asSInt === SInt(-2), e === SInt(-1), e(0)))
+    Cat(msb, ea(vaddrBits-1,0))
+  }*/
 
   //io.prci <> csr.io.prci
 
@@ -117,7 +148,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
   val dmem_lgen = new LoadGen(io.ctrl.ll.mem_type, Bool(false),dmem_load_lowaddr, io.ctrl.repmem.dmem.hrdata, Bool(false), 4)
 
   // MUL/DIV
-  val (mulDivRespValid, mulDivRespData, mulDivReqReady) = if (haveMExt) {
+  val (mulDivRespValid : Bool, mulDivRespData : UInt, mulDivReqReady : Bool) = if (haveMExt) {
     /*val mulDivParams = MulDivParams()
     mulDivParams.mulUnroll = if(fastMulDiv) 8 else 1
     mulDivParams.divUnroll = if(fastMulDiv) 8 else 1
@@ -137,8 +168,8 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p) {
     muldiv.io.req.bits.in2 := id_rs(1)
     muldiv.io.kill := Bool(false)
     muldiv.io.resp.ready := Bool(true)
-    (Wire(muldiv.io.resp.valid), Wire(muldiv.io.resp.bits.data), Wire(muldiv.io.req.ready))
-  } else (Wire(Bool(false)), Wire(UInt(0)), Wire(Bool(false)))
+    (muldiv.io.resp.valid, muldiv.io.resp.bits.data, muldiv.io.req.ready)
+  } else (Bool(false), UInt(0), Bool(false))
 
   // WB
   val ll_wen = dmem_resp_valid || mulDivRespValid
