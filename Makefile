@@ -30,6 +30,9 @@ default_submodules := . rocket-chip rocket-chip/hardfloat rocket-chip/chisel3
 chisel_srcs := $(foreach submodule,$(default_submodules),$(shell find $(base_dir)/$(submodule)/$(src_path) -name "*.scala"))
 SBT ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -jar $(base_dir)/rocket-chip/sbt-launch.jar
 
+# include Makefiles
+include tests.mk
+
 # Makefile rules
 .SECONDARY: $(firrtl) $(verilog)
 
@@ -61,7 +64,7 @@ $(generated_dir)/%.v $(generated_dir)/%.conf: $(generated_dir)/%.fir $(FIRRTL_JA
 	@echo "\`include \"$(long_name).v\"" >> $(generated_dir)/$(long_name).timescale.v
 	@echo "" >> $(generated_dir)/$(long_name).timescale.v
 
-clean: clean-verilog
+clean: clean-verilog clean-firmware
 	$(MAKE) -C rocket-chip/firrtl clean
 	$(SBT) clean compiler-cache clean-files
 	rm -rfv ./lib $(FIRRTL_JAR)

@@ -8,10 +8,12 @@
 # Helper macros
 #-----------------------------------------------------------------------
 
+#define MASK_XLEN(x) ((x) & ((1 << (__riscv_xlen - 1) << 1) - 1))
+
 #define TEST_CASE( testnum, testreg, correctval, code... ) \
 test_ ## testnum: \
     code; \
-    li  x29, correctval; \
+    li  x29, MASK_XLEN(correctval); \
     li  TESTNUM, testnum; \
     bne testreg, x29, fail;
 
@@ -43,20 +45,20 @@ test_ ## testnum: \
 
 #define TEST_IMM_OP( testnum, inst, result, val1, imm ) \
     TEST_CASE( testnum, x3, result, \
-      li  x1, val1; \
+      li  x1, MASK_XLEN(val1); \
       inst x3, x1, SEXT_IMM(imm); \
     )
 
 #define TEST_IMM_SRC1_EQ_DEST( testnum, inst, result, val1, imm ) \
     TEST_CASE( testnum, x1, result, \
-      li  x1, val1; \
+      li  x1, MASK_XLEN(val1); \
       inst x1, x1, SEXT_IMM(imm); \
     )
 
 #define TEST_IMM_DEST_BYPASS( testnum, nop_cycles, inst, result, val1, imm ) \
     TEST_CASE( testnum, x6, result, \
       li  x4, 0; \
-1:    li  x1, val1; \
+1:    li  x1, MASK_XLEN(val1); \
       inst x3, x1, SEXT_IMM(imm); \
       TEST_INSERT_NOPS_ ## nop_cycles \
       addi  x6, x3, 0; \
@@ -68,7 +70,7 @@ test_ ## testnum: \
 #define TEST_IMM_SRC1_BYPASS( testnum, nop_cycles, inst, result, val1, imm ) \
     TEST_CASE( testnum, x3, result, \
       li  x4, 0; \
-1:    li  x1, val1; \
+1:    li  x1, MASK_XLEN(val1); \
       TEST_INSERT_NOPS_ ## nop_cycles \
       inst x3, x1, SEXT_IMM(imm); \
       addi  x4, x4, 1; \
@@ -83,36 +85,8 @@ test_ ## testnum: \
 
 #define TEST_IMM_ZERODEST( testnum, inst, val1, imm ) \
     TEST_CASE( testnum, x0, 0, \
-      li  x1, val1; \
+      li  x1, MASK_XLEN(val1); \
       inst x0, x1, SEXT_IMM(imm); \
-    )
-
-#-----------------------------------------------------------------------
-# Tests for vector config instructions
-#-----------------------------------------------------------------------
-
-#define TEST_VSETCFGIVL( testnum, nxpr, nfpr, bank, vl, result ) \
-    TEST_CASE( testnum, x1, result, \
-      li x1, (bank << 12); \
-      vsetcfg x1,nxpr,nfpr; \
-      li x1, vl; \
-      vsetvl x1,x1; \
-    )
-
-#define TEST_VVCFG( testnum, nxpr, nfpr, bank, vl, result ) \
-    TEST_CASE( testnum, x1, result, \
-      li x1, (bank << 12) | (nfpr << 6) | nxpr; \
-      vsetcfg x1; \
-      li x1, vl; \
-      vsetvl x1,x1; \
-    )
-
-#define TEST_VSETVL( testnum, nxpr, nfpr, bank, vl, result ) \
-    TEST_CASE( testnum, x1, result, \
-      li x1, (bank << 12); \
-      vsetcfg x1,nxpr,nfpr; \
-      li x1, vl; \
-      vsetvl x1, x1; \
     )
 
 #-----------------------------------------------------------------------
@@ -149,36 +123,36 @@ test_ ## testnum: \
 
 #define TEST_RR_OP( testnum, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x3, result, \
-      li  x1, val1; \
-      li  x2, val2; \
+      li  x1, MASK_XLEN(val1); \
+      li  x2, MASK_XLEN(val2); \
       inst x3, x1, x2; \
     )
 
 #define TEST_RR_SRC1_EQ_DEST( testnum, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x1, result, \
-      li  x1, val1; \
-      li  x2, val2; \
+      li  x1, MASK_XLEN(val1); \
+      li  x2, MASK_XLEN(val2); \
       inst x1, x1, x2; \
     )
 
 #define TEST_RR_SRC2_EQ_DEST( testnum, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x2, result, \
-      li  x1, val1; \
-      li  x2, val2; \
+      li  x1, MASK_XLEN(val1); \
+      li  x2, MASK_XLEN(val2); \
       inst x2, x1, x2; \
     )
 
 #define TEST_RR_SRC12_EQ_DEST( testnum, inst, result, val1 ) \
     TEST_CASE( testnum, x1, result, \
-      li  x1, val1; \
+      li  x1, MASK_XLEN(val1); \
       inst x1, x1, x1; \
     )
 
 #define TEST_RR_DEST_BYPASS( testnum, nop_cycles, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x6, result, \
       li  x4, 0; \
-1:    li  x1, val1; \
-      li  x2, val2; \
+1:    li  x1, MASK_XLEN(val1); \
+      li  x2, MASK_XLEN(val2); \
       inst x3, x1, x2; \
       TEST_INSERT_NOPS_ ## nop_cycles \
       addi  x6, x3, 0; \
@@ -190,9 +164,9 @@ test_ ## testnum: \
 #define TEST_RR_SRC12_BYPASS( testnum, src1_nops, src2_nops, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x3, result, \
       li  x4, 0; \
-1:    li  x1, val1; \
+1:    li  x1, MASK_XLEN(val1); \
       TEST_INSERT_NOPS_ ## src1_nops \
-      li  x2, val2; \
+      li  x2, MASK_XLEN(val2); \
       TEST_INSERT_NOPS_ ## src2_nops \
       inst x3, x1, x2; \
       addi  x4, x4, 1; \
@@ -203,9 +177,9 @@ test_ ## testnum: \
 #define TEST_RR_SRC21_BYPASS( testnum, src1_nops, src2_nops, inst, result, val1, val2 ) \
     TEST_CASE( testnum, x3, result, \
       li  x4, 0; \
-1:    li  x2, val2; \
+1:    li  x2, MASK_XLEN(val2); \
       TEST_INSERT_NOPS_ ## src1_nops \
-      li  x1, val1; \
+      li  x1, MASK_XLEN(val1); \
       TEST_INSERT_NOPS_ ## src2_nops \
       inst x3, x1, x2; \
       addi  x4, x4, 1; \
@@ -215,13 +189,13 @@ test_ ## testnum: \
 
 #define TEST_RR_ZEROSRC1( testnum, inst, result, val ) \
     TEST_CASE( testnum, x2, result, \
-      li x1, val; \
+      li x1, MASK_XLEN(val); \
       inst x2, x0, x1; \
     )
 
 #define TEST_RR_ZEROSRC2( testnum, inst, result, val ) \
     TEST_CASE( testnum, x2, result, \
-      li x1, val; \
+      li x1, MASK_XLEN(val); \
       inst x2, x1, x0; \
     )
 
@@ -232,8 +206,8 @@ test_ ## testnum: \
 
 #define TEST_RR_ZERODEST( testnum, inst, val1, val2 ) \
     TEST_CASE( testnum, x0, 0, \
-      li x1, val1; \
-      li x2, val2; \
+      li x1, MASK_XLEN(val1); \
+      li x2, MASK_XLEN(val2); \
       inst x0, x1, x2; \
     )
 
@@ -310,42 +284,6 @@ test_ ## testnum: \
     load_inst x3, offset(x2); \
     li  x29, result; \
     bne x3, x29, fail; \
-    addi  x4, x4, 1; \
-    li  x5, 2; \
-    bne x4, x5, 1b \
-
-#-----------------------------------------------------------------------
-# Test branch instructions
-#-----------------------------------------------------------------------
-
-#define TEST_BR1_OP_TAKEN( testnum, inst, val1 ) \
-test_ ## testnum: \
-    li  TESTNUM, testnum; \
-    li  x1, val1; \
-    inst x1, 2f; \
-    bne x0, TESTNUM, fail; \
-1:  bne x0, TESTNUM, 3f; \
-2:  inst x1, 1b; \
-    bne x0, TESTNUM, fail; \
-3:
-
-#define TEST_BR1_OP_NOTTAKEN( testnum, inst, val1 ) \
-test_ ## testnum: \
-    li  TESTNUM, testnum; \
-    li  x1, val1; \
-    inst x1, 1f; \
-    bne x0, TESTNUM, 2f; \
-1:  bne x0, TESTNUM, fail; \
-2:  inst x1, 1b; \
-3:
-
-#define TEST_BR1_SRC1_BYPASS( testnum, nop_cycles, inst, val1 ) \
-test_ ## testnum: \
-    li  TESTNUM, testnum; \
-    li  x4, 0; \
-1:  li  x1, val1; \
-    TEST_INSERT_NOPS_ ## nop_cycles \
-    inst x1, fail; \
     addi  x4, x4, 1; \
     li  x5, 2; \
     bne x4, x5, 1b \
@@ -436,6 +374,11 @@ test_ ## testnum: \
 # Tests floating-point instructions
 #-----------------------------------------------------------------------
 
+#define qNaNf 0f:7fc00000
+#define sNaNf 0f:7f800001
+#define qNaN 0d:7ff8000000000000
+#define sNaN 0d:7ff0000000000001
+
 #define TEST_FP_OP_S_INTERNAL( testnum, flags, result, val1, val2, val3, code... ) \
 test_ ## testnum: \
   li  TESTNUM, testnum; \
@@ -449,16 +392,14 @@ test_ ## testnum: \
   li a2, flags; \
   bne a0, a3, fail; \
   bne a1, a2, fail; \
-  j 2f; \
+  .pushsection .data; \
   .align 2; \
-  .data; \
   test_ ## testnum ## _data: \
   .float val1; \
   .float val2; \
   .float val3; \
   .result; \
-  .text; \
-2:
+  .popsection
 
 #define TEST_FP_OP_D_INTERNAL( testnum, flags, result, val1, val2, val3, code... ) \
 test_ ## testnum: \
@@ -473,16 +414,14 @@ test_ ## testnum: \
   li a2, flags; \
   bne a0, a3, fail; \
   bne a1, a2, fail; \
-  j 2f; \
-  .data; \
+  .pushsection .data; \
   .align 3; \
   test_ ## testnum ## _data: \
   .double val1; \
   .double val2; \
   .double val3; \
   .result; \
-  .text; \
-2:
+  .popsection
 
 #define TEST_FCVT_S_D( testnum, result, val1 ) \
   TEST_FP_OP_D_INTERNAL( testnum, 0, double result, val1, 0.0, 0.0, \
@@ -498,6 +437,14 @@ test_ ## testnum: \
 
 #define TEST_FP_OP1_D( testnum, inst, flags, result, val1 ) \
   TEST_FP_OP_D_INTERNAL( testnum, flags, double result, val1, 0.0, 0.0, \
+                    inst f3, f0; fmv.x.d a0, f3)
+
+#define TEST_FP_OP1_S_DWORD_RESULT( testnum, inst, flags, result, val1 ) \
+  TEST_FP_OP_S_INTERNAL( testnum, flags, dword result, val1, 0.0, 0.0, \
+                    inst f3, f0; fmv.x.s a0, f3)
+
+#define TEST_FP_OP1_D_DWORD_RESULT( testnum, inst, flags, result, val1 ) \
+  TEST_FP_OP_D_INTERNAL( testnum, flags, dword result, val1, 0.0, 0.0, \
                     inst f3, f0; fmv.x.d a0, f3)
 
 #define TEST_FP_OP2_S( testnum, inst, flags, result, val1, val2 ) \
@@ -524,13 +471,21 @@ test_ ## testnum: \
   TEST_FP_OP_D_INTERNAL( testnum, flags, dword result, val1, 0.0, 0.0, \
                     inst a0, f0, rm)
 
-#define TEST_FP_CMP_OP_S( testnum, inst, result, val1, val2 ) \
-  TEST_FP_OP_S_INTERNAL( testnum, 0, word result, val1, val2, 0.0, \
+#define TEST_FP_CMP_OP_S( testnum, inst, flags, result, val1, val2 ) \
+  TEST_FP_OP_S_INTERNAL( testnum, flags, word result, val1, val2, 0.0, \
                     inst a0, f0, f1)
 
-#define TEST_FP_CMP_OP_D( testnum, inst, result, val1, val2 ) \
-  TEST_FP_OP_D_INTERNAL( testnum, 0, dword result, val1, val2, 0.0, \
+#define TEST_FP_CMP_OP_D( testnum, inst, flags, result, val1, val2 ) \
+  TEST_FP_OP_D_INTERNAL( testnum, flags, dword result, val1, val2, 0.0, \
                     inst a0, f0, f1)
+
+#define TEST_FCLASS_S(testnum, correct, input) \
+  TEST_CASE(testnum, a0, correct, li a0, input; fmv.s.x fa0, a0; \
+                    fclass.s a0, fa0)
+
+#define TEST_FCLASS_D(testnum, correct, input) \
+  TEST_CASE(testnum, a0, correct, li a0, input; fmv.d.x fa0, a0; \
+                    fclass.d a0, fa0)
 
 #define TEST_INT_FP_OP_S( testnum, inst, result, val1 ) \
 test_ ## testnum: \
@@ -542,11 +497,11 @@ test_ ## testnum: \
   fsflags x0; \
   fmv.x.s a0, f0; \
   bne a0, a3, fail; \
-  j 1f; \
+  .pushsection .data; \
   .align 2; \
   test_ ## testnum ## _data: \
   .float result; \
-1:
+  .popsection
 
 #define TEST_INT_FP_OP_D( testnum, inst, result, val1 ) \
 test_ ## testnum: \
@@ -558,11 +513,11 @@ test_ ## testnum: \
   fsflags x0; \
   fmv.x.d a0, f0; \
   bne a0, a3, fail; \
-  j 1f; \
+  .pushsection .data; \
   .align 3; \
   test_ ## testnum ## _data: \
   .double result; \
-1:
+  .popsection
 
 #-----------------------------------------------------------------------
 # Pass and fail code (assumes test num is in TESTNUM)

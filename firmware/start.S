@@ -72,7 +72,6 @@ start:
 
 	TEST(lui)
 	TEST(auipc)
-	TEST(j)
 	TEST(jal)
 	TEST(jalr)
 
@@ -103,7 +102,8 @@ start:
 #endif
 
 	TEST(addi)
-	TEST(slti) // also tests sltiu
+	TEST(slti)
+	TEST(sltiu)
 	TEST(xori)
 	TEST(ori)
 	TEST(andi)
@@ -120,7 +120,8 @@ start:
 	TEST(add)
 	TEST(sub)
 	TEST(sll)
-	TEST(slt) // what is with sltu ?
+	TEST(slt)
+	TEST(sltu)
 	TEST(xor)
 	TEST(srl)
 	TEST(sra)

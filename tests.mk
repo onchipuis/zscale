@@ -46,12 +46,15 @@ firmware/%.o: firmware/%.c
 
 tests/rv$(XLEN)/%.o: tests/rv$(XLEN)/%.S tests/macros/scalar/riscv_test.h tests/macros/scalar/test_macros.h
 	$(TOOLCHAIN_PREFIX)gcc -c -march=rv$(XLEN)im -o $@ -DTEST_FUNC_NAME=$(notdir $(basename $<)) \
-		-DTEST_FUNC_TXT='"$(notdir $(basename $<))"' -DTEST_FUNC_RET=$(notdir $(basename $<))_ret $<
+		-DTEST_FUNC_TXT='"$(notdir $(basename $<))"' -DTEST_FUNC_RET=$(notdir $(basename $<))_ret -I./tests/macros/scalar $<
 
-clean:
+seecode: firmware/firmware.elf
+	$(TOOLCHAIN_PREFIX)objdump -d -M numeric,no-aliases firmware/firmware.elf | less
+
+clean-firmware:
 	rm -vrf $(FIRMWARE_OBJS) $(TEST_OBJS) \
 		firmware/firmware.elf firmware/firmware.bin firmware/firmware.hex firmware/firmware.map \
 		firmware/firmware_mini.elf firmware/firmware_mini.bin firmware/firmware_mini.hex firmware/firmware_mini.map firmware/*.o *.hex
 
-.PHONY: all clean
+.PHONY: clean-firmware
 
