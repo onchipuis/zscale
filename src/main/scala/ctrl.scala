@@ -141,25 +141,38 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
   when (!io.dpath.stalldx) {
     id_valid := !io.dpath.killf
   }
+  
+  // ********* FULL DECODE TABLE ************
+  // ** Decode table explained:
+  // val: There is an instruction
+  // j: Is a jump instruction
+  // br: Is branch instruction
+  // f.i: Is a FENCE.I instruction
+  // csr: CSR command to execute
+  // s_aluX: Selector for operator X in ALU
+  // imm: Type of imm to decode
+  // fn: ALU operation
+  // wen: Is writeback to rd?
+  // r1: Read from rs1?
+  // r2: Read from rs2?
+  // sb: TODO: Seems to be a instruction that is executed multiple cycles using valid/ready
+  // mem: Is a memory instruction
+  // rw: Memory instruction writes (Y) or reads (N) the memory
+  // mtype: Memory type of instruction
+  // mul: Is a MUL/DIV instruction
+  // dw: rd result expansion mode (used in ALU)
+  
+  // TODO: Support for C and A instruction sets
 
                   //  val j br f.i csr    s_alu1   s_alu2   imm     fn       wen r1 r2 sb mem rw mtype  mul dw
                   //   |  |  |  |  |      |        |        |       |          |  |  |  |  |  |  |      |   |
   val decode_default: List[BitPat] =
                   List(N, X, X, X, CSR.X, A1_X,    A2_X,    IMM_X,  FN_X,      X, X, X, X, X, X, MT_X,  X, DW_X)
-  val mulDivDecodeTable: Array[(BitPat, List[BitPat])] = Array(
-      MUL->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MUL,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      MULH->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULH,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      MULHU->     List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULHU,  N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      MULHSU->    List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULHSU, N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      DIV->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIV,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      DIVU->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIVU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      REM->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REM,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
-      REMU->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REMU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR))
   val intDecodeTable: Array[(BitPat, List[BitPat])] = Array(
       LUI->       List(Y, N, N, N, CSR.N, A1_ZERO, A2_IMM,  IMM_U,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR),
       AUIPC->     List(Y, N, N, N, CSR.N, A1_PC,   A2_IMM,  IMM_U,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR),
 
-      // TODO: Why JAL and JALR have the same s_aluX?
+      // NOTE: Why JAL and JALR have the same s_aluX?
       JAL->       List(Y, Y, N, N, CSR.N, A1_PC,   A2_SIZE, IMM_UJ, FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR),
       JALR->      List(Y, Y, N, N, CSR.N, A1_PC,   A2_SIZE, IMM_I,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
 
@@ -213,10 +226,44 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
       CSRRC->     List(Y, N, N, N, CSR.C, A1_RS1,  A2_ZERO, IMM_X,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
       CSRRWI->    List(Y, N, N, N, CSR.W, A1_ZERO, A2_IMM,  IMM_Z,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR),
       CSRRSI->    List(Y, N, N, N, CSR.S, A1_ZERO, A2_IMM,  IMM_Z,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR),
-      CSRRCI->    List(Y, N, N, N, CSR.C, A1_ZERO, A2_IMM,  IMM_Z,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR))
+      CSRRCI->    List(Y, N, N, N, CSR.C, A1_ZERO, A2_IMM,  IMM_Z,  FN_ADD,    Y, N, N, N, N, X, MT_X,  N, DW_XPR))     
+  val int64DecodeTable: Array[(BitPat, List[BitPat])] = Array(
+      LD->        List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_ADD,    Y, Y, N, Y, Y, N, MT_D,  N, DW_XPR),
+      LWU->       List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_ADD,    Y, Y, N, Y, Y, N, MT_WU, N, DW_XPR),
+      SD->        List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_S,  FN_ADD,    N, Y, Y, Y, Y, Y, MT_D,  N, DW_XPR),
+      
+      ADDIW->     List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_ADD,    Y, Y, N, N, N, X, MT_X,  N, DW_32),
+      SLLIW->     List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SL,     Y, Y, N, N, N, X, MT_X,  N, DW_32),
+      SRLIW->     List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SR,     Y, Y, N, N, N, X, MT_X,  N, DW_32),
+      SRAIW->     List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SRA,    Y, Y, N, N, N, X, MT_X,  N, DW_32),
+      ADDW->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_ADD,    Y, Y, Y, N, N, X, MT_X,  N, DW_32),
+      SUBW->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_SUB,    Y, Y, Y, N, N, X, MT_X,  N, DW_32),
+      SLLW->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_SL,     Y, Y, Y, N, N, X, MT_X,  N, DW_32),
+      SRLW->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_SR,     Y, Y, Y, N, N, X, MT_X,  N, DW_32),
+      SRAW->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_SRA,    Y, Y, Y, N, N, X, MT_X,  N, DW_32))
+  // NOTE: Why in rocket in MUL decodes, s_aluX is putted to A1_RSX?
+  val mulDivDecodeTable: Array[(BitPat, List[BitPat])] = Array(
+      MUL->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MUL,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      MULH->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULH,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      MULHU->     List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULHU,  N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      MULHSU->    List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MULHSU, N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      DIV->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIV,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      DIVU->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIVU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      REM->       List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REM,    N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR),
+      REMU->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REMU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_XPR))
+  val mulDiv64DecodeTable: Array[(BitPat, List[BitPat])] = Array(
+      MULW->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_MUL,    N, Y, Y, Y, N, X, MT_X,  Y, DW_32),
+      DIVW->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIV,    N, Y, Y, Y, N, X, MT_X,  Y, DW_32),
+      DIVUW->     List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_DIVU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_32),
+      REMW->      List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REM,    N, Y, Y, Y, N, X, MT_X,  Y, DW_32),
+      REMUW->     List(Y, N, N, N, CSR.N, A1_X,    A2_X,    IMM_X,  FN_REMU,   N, Y, Y, Y, N, X, MT_X,  Y, DW_32))
 
-  val decodeTable = intDecodeTable ++
-    (if (haveMExt) mulDivDecodeTable else Array[(BitPat, List[BitPat])]())
+  // NOTE: E is later checked for register accesing (via haveEExt)
+  // TODO: If including A, cannot be supported with E
+  val decodeTable =                 intDecodeTable                                            ++
+    (if (xLen == 64)                int64DecodeTable    else Array[(BitPat, List[BitPat])]()) ++
+    (if (haveMExt)                  mulDivDecodeTable   else Array[(BitPat, List[BitPat])]()) ++
+    (if (haveMExt && xLen == 64)    mulDiv64DecodeTable else Array[(BitPat, List[BitPat])]())
 
   val cs = DecodeLogic(io.dpath.inst, decode_default, decodeTable)
 

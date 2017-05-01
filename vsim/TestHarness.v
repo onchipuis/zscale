@@ -16,7 +16,7 @@ module TestHarness_tb #(
   parameter VERBOSE = 1,
 `endif
 `ifndef XLEN
-  parameter XLen = 32
+  parameter XLen = 64
 `else
   parameter XLen = XLEN
 `endif

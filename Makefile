@@ -11,10 +11,11 @@
 
 # Variables
 #TODO: change me: TestHarness
+XLEN ?= 64
 MODEL ?= ExampleTopZscale
 PROJECT ?= zscale
 CFG_PROJECT ?= $(PROJECT)
-CONFIG ?= TinyConfig
+CONFIG ?= Default$(XLEN)Config
 FIRRTL_JAR ?= rocket-chip/firrtl/utils/bin/firrtl.jar
 FIRRTL ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -cp $(FIRRTL_JAR) firrtl.Driver
 
@@ -60,9 +61,12 @@ $(generated_dir)/%.v $(generated_dir)/%.conf: $(generated_dir)/%.fir $(FIRRTL_JA
 	@echo "\`include \"$(long_name).v\"" >> $(generated_dir)/$(long_name).timescale.v
 	@echo "" >> $(generated_dir)/$(long_name).timescale.v
 
-clean:
+clean: clean-verilog
 	$(MAKE) -C rocket-chip/firrtl clean
 	$(SBT) clean compiler-cache clean-files
 	rm -rfv ./lib $(FIRRTL_JAR)
 
-.PHONY: compile
+clean-verilog:
+	rm -rfv $(generated_dir)
+
+.PHONY: compile clean clean-verilog

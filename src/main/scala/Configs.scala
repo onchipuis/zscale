@@ -23,6 +23,7 @@ case object FastMulDiv extends Field[Boolean]
 case object useMExt extends Field[Boolean]
 case object useEExt extends Field[Boolean]
 case object useCExt extends Field[Boolean]
+case object useAExt extends Field[Boolean]
 case object zscaleID extends Field[Int]
 
 class BasePlatformConfig extends Config((site, here, up) => {
@@ -39,11 +40,13 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
   case ASIdBits => 0
   // General
   case XLen => 64 
-  case `useEExt` => false
-  case `useCExt` => false
   case `useMExt` => true
+  case `useEExt` => false
   case `FastMulDiv` => true
   case `zscaleID` => 12345
+  // TODO: Unsuported, put always in false
+  case `useCExt` => false
+  case `useAExt` => false
 })
 
 /** Actual elaboratable target Configs */
@@ -51,14 +54,22 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
 class BaseConfig extends Config(new BaseCoreplexConfig ++ new BasePlatformConfig)
 class DefaultConfig extends Config(new BaseConfig)
 
+// Just a placeholder
+class Default64Config extends Config(new BaseConfig)
+class Default32Config extends Config(
+  new BaseConfig().alter((site, here, up) => {
+    case XLen => 32 
+  }))
+
 // Tiniest config possible
 class TinyConfig extends Config(
   new BaseConfig().alter((site, here, up) => {
     case XLen => 32 
-  case `useEExt` => false
-  case `useCExt` => false
-  case `useMExt` => true
-  case `FastMulDiv` => false
+    case `useEExt` => true
+    case `useMExt` => false
+    case `FastMulDiv` => false
   }))
+  
+
 
 
