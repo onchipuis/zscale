@@ -4,7 +4,7 @@ TEST_MINI ?= add
 
 # Constants
 TEST_OBJS = $(addsuffix .o,$(basename $(wildcard tests/rv$(XLEN)/*.S)))
-FIRMWARE_OBJS = firmware/start.o
+FIRMWARE_OBJS = firmware/start.o firmware/print.o firmware/sieve.o firmware/multest.o firmware/stats.o
 GCC_WARNS  = -Werror -Wall -Wextra -Wshadow -Wundef -Wpointer-arith -Wcast-qual -Wcast-align -Wwrite-strings
 GCC_WARNS += -Wredundant-decls -Wstrict-prototypes -Wmissing-prototypes -pedantic # -Wconversion
 TOOLCHAIN_PREFIX = riscv$(XLEN)-unknown-elf-
@@ -55,6 +55,4 @@ clean-firmware:
 	rm -vrf $(FIRMWARE_OBJS) $(TEST_OBJS) \
 		firmware/firmware.elf firmware/firmware.bin firmware/firmware.hex firmware/firmware.map \
 		firmware/firmware_mini.elf firmware/firmware_mini.bin firmware/firmware_mini.hex firmware/firmware_mini.map firmware/*.o *.hex
-
-.PHONY: clean-firmware
 

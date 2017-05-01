@@ -453,7 +453,7 @@ module ahb_memory #(
       end
     end else
     if (waddr == (XLen == 64? 64'h2000_0000:32'h2000_0000)) begin
-      if (wdata == 123456789)
+      if (wdata == (XLen == 64? 64'd123456789:32'd123456789))
         tests_passed = 1;
     end else begin
       $display("OUT-OF-BOUNDS MEMORY WRITE TO %x", waddr);

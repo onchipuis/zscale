@@ -176,7 +176,7 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
                                    earlyOut = fastMulDiv*/))
     muldiv.io.req.valid := io.ctrl.id.mul_valid
     muldiv.io.req.bits.fn := io.ctrl.id.fn_alu
-    muldiv.io.req.bits.dw := DW_64
+    muldiv.io.req.bits.dw := io.ctrl.id.dw_alu
     muldiv.io.req.bits.in1 := id_rs(0)
     muldiv.io.req.bits.in2 := id_rs(1)
     muldiv.io.kill := Bool(false)

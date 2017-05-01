@@ -198,9 +198,9 @@ class Control(implicit p: Parameters) extends ZscaleModule()(p) /*with DecodeCon
       XORI->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_XOR,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
       ORI->       List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_OR,     Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
       ANDI->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_AND,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
-      SLLI_RV32-> List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SL,     Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
-      SRLI_RV32-> List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SR,     Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
-      SRAI_RV32-> List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SRA,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
+      SLLI->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SL,     Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
+      SRLI->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SR,     Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
+      SRAI->      List(Y, N, N, N, CSR.N, A1_RS1,  A2_IMM,  IMM_I,  FN_SRA,    Y, Y, N, N, N, X, MT_X,  N, DW_XPR),
 
       ADD->       List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_ADD,    Y, Y, Y, N, N, X, MT_X,  N, DW_XPR),
       SUB->       List(Y, N, N, N, CSR.N, A1_RS1,  A2_RS2,  IMM_X,  FN_SUB,    Y, Y, Y, N, N, X, MT_X,  N, DW_XPR),

@@ -6,6 +6,9 @@
 // means.
 
 #define ENABLE_RVTST
+#define ENABLE_SIEVE
+#define ENABLE_MULTST
+#define ENABLE_STATS
 
 #ifndef XLEN
 #define XLEN 64
@@ -14,6 +17,13 @@
 #include "custom_ops.S"
 
 	.section .text
+	.global sieve
+	.global multest
+	.global hard_mul
+	.global hard_mulh
+	.global hard_mulhsu
+	.global hard_mulhu
+	.global stats
 
 reset_vec:
 
@@ -82,25 +92,6 @@ start:
 	TEST(bltu)
 	TEST(bgeu)
 
-	TEST(lb)
-	TEST(lh)
-	TEST(lw)
-#if defined XLEN && XLEN == 64
-	TEST(ld)
-#endif
-	TEST(lbu)
-	TEST(lhu)
-#if defined XLEN && XLEN == 64
-	TEST(lwu)
-#endif
-
-	TEST(sb)
-	TEST(sh)
-	TEST(sw)
-#if defined XLEN && XLEN == 64
-	TEST(sd)
-#endif
-
 	TEST(addi)
 	TEST(slti)
 	TEST(sltiu)
@@ -135,6 +126,25 @@ start:
   TEST(sraw)
 #endif
 
+	TEST(lb)
+	TEST(lh)
+	TEST(lw)
+#if defined XLEN && XLEN == 64
+	TEST(ld)
+#endif
+	TEST(lbu)
+	TEST(lhu)
+#if defined XLEN && XLEN == 64
+	TEST(lwu)
+#endif
+
+	TEST(sb)
+	TEST(sh)
+	TEST(sw)
+#if defined XLEN && XLEN == 64
+	TEST(sd)
+#endif
+
 	TEST(mul)
 	TEST(mulhu)
 	TEST(mulh)
@@ -166,6 +176,21 @@ start:
 	addi tp, gp, 0
 	
 	/* Call aditional C functions here!*/
+#ifdef ENABLE_SIEVE
+	/* call sieve C code */
+	jal ra,sieve
+#endif
+
+#if defined ENABLE_MULTST && defined XLEN && XLEN == 32
+	/* call multest C code */
+	/* Note: This only works in 32-bit mode*/
+	jal ra,multest
+#endif
+
+#ifdef ENABLE_STATS
+	/* call stats C code */
+	jal ra,stats
+#endif
 
 	/* print "DONE\n" */
 	lui a0,0x10000000>>12
@@ -183,8 +208,29 @@ start:
 	/*Tell simulator that everything is finished*/
 	li a0, 0x20000000
 	li a1, 123456789
-	sw a1,0(a0)
-
+#if defined XLEN && XLEN == 64
+	sd a1,0(a0)
+#else
+  sw a1,0(a0)
+#endif
 	/* break */
 	sbreak
 
+/* Hard mul functions for multest.c
+ **********************************/
+
+hard_mul:
+	mul a0, a0, a1
+	ret
+
+hard_mulh:
+	mulh a0, a0, a1
+	ret
+
+hard_mulhsu:
+	mulhsu a0, a0, a1
+	ret
+
+hard_mulhu:
+	mulhu a0, a0, a1
+	ret
