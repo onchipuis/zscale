@@ -21,7 +21,7 @@ module TestHarness_tb #(
   parameter XLen = `XLEN
 `endif
 );
-testbench #(AHB_TEST, VERBOSE, XLen) tb ();
+testbench #(.AHB_TEST(AHB_TEST), .VERBOSE(VERBOSE), .XLen(XLen)) tb ();
 endmodule
 
 module TestHarness #(
@@ -35,9 +35,13 @@ module TestHarness #(
 `else
   parameter VERBOSE = 1,
 `endif
-  parameter XLen = 32
+`ifndef XLEN
+  parameter XLen = 64
+`else
+  parameter XLen = `XLEN
+`endif
 );
-testbench #(AHB_TEST, VERBOSE, XLen) tb ();
+testbench #(.AHB_TEST(AHB_TEST), .VERBOSE(VERBOSE), .XLen(XLen)) tb ();
 endmodule
 
 
