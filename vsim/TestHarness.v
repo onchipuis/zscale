@@ -18,7 +18,7 @@ module TestHarness_tb #(
 `ifndef XLEN
   parameter XLen = 64
 `else
-  parameter XLen = XLEN
+  parameter XLen = `XLEN
 `endif
 );
 testbench #(AHB_TEST, VERBOSE, XLen) tb ();
