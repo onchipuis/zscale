@@ -28,11 +28,6 @@ class Datapath(implicit p: Parameters) extends ZscaleModule()(p)
   {
   val io = new Bundle {
     val ctrl = new CtrlDpathIO().flip
-    // FIX: Just replace "io.ctrl.repmem" to "io.mem" in this file
-    //val mem = new MemIO 
-    //val imem = new HastiMasterIO
-    //val dmem = new HastiMasterIO
-    //val prci = new PRCITileIO().flip
   }
 
   val pc = Reg(init = UInt("h0000", xLen))

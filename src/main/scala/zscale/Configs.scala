@@ -25,12 +25,25 @@ case object useEExt extends Field[Boolean]
 case object useCExt extends Field[Boolean]
 case object useAExt extends Field[Boolean]
 case object zscaleID extends Field[Int]
+case object useDM extends Field[Boolean]
+import rocketchip.IncludeJtagDTM
+case object IncludeSPIDTM extends Field[Boolean]
+case object IncludeI2CDTM extends Field[Boolean]
+import rocketchip.RTCPeriod
 
 class BasePlatformConfig extends Config((site, here, up) => {
   // DTS descriptive parameters (TODO: Not used yet)
   case DTSModel => "ucbbar-uis,zscale-unknown"
   case DTSCompat => Nil
   case DTSTimebase => BigInt(1000000) // 1 MHz
+  // RTC module configuration (TODO: Not implemented yet)
+  case RTCPeriod => BigInt(10000) // 10 KHz
+  // Debug module configurations
+  case `useDM` => true
+  case IncludeJtagDTM => true
+  // TODO: Unsupported, put always in false
+  case `IncludeSPIDTM` => false
+  case `IncludeI2CDTM` => false
 })
 
 class BaseCoreplexConfig extends Config ((site, here, up) => {
@@ -44,7 +57,7 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
   case `useEExt` => false
   case `FastMulDiv` => true
   case `zscaleID` => 12345
-  // TODO: Unsuported, put always in false
+  // TODO: Unsupported, put always in false
   case `useCExt` => false
   case `useAExt` => false
 })
