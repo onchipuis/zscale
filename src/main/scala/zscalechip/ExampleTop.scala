@@ -24,17 +24,21 @@ class DebugModule[+L <: Debug, +B <: DebugBundle[L]](_outer: L, _io: () => B) ex
 
 class ExampleTopZscaleBundle(implicit p: Parameters) extends Bundle {
   val mem = new MemIO
-  // INFO: I'm the bad cop, this is I do not want DM if there is no config about this
-  val dbgio = new Bundle {
-      val debug = if(!p(IncludeJtagDTM) && p(useDM)) Some(new ClockedDMIIO().flip) else None
+  // INFO: This bundle holds all optional ports
+  val opt_port = new Bundle {
+    val dbgio = if(p(useDM)) Some(new Bundle {
+      val debug = if(!p(IncludeJtagDTM)) Some(new ClockedDMIIO().flip) else None
 
-      val jtag        = if(p(IncludeJtagDTM) && p(useDM)) Some(new JTAGIO(hasTRSTn = false).flip) else None
-      val jtag_reset  = if(p(IncludeJtagDTM) && p(useDM)) Some(Bool(INPUT)) else None
-      val jtag_mfr_id = if(p(IncludeJtagDTM) && p(useDM)) Some(UInt(INPUT, 11)) else None
+      val jtag        = if(p(IncludeJtagDTM)) Some(new JTAGIO(hasTRSTn = false).flip) else None
+      val jtag_reset  = if(p(IncludeJtagDTM)) Some(Bool(INPUT)) else None
+      val jtag_mfr_id = if(p(IncludeJtagDTM)) Some(UInt(INPUT, 11)) else None
 
-      val ndreset = if(p(useDM)) Bool(OUTPUT) else None
-      val dmactive = if(p(useDM)) Bool(OUTPUT) else None
-    }
+      val ndreset = Bool(OUTPUT)
+      val dmactive = Bool(OUTPUT)
+    })
+    else None
+  }
+  
   val trap = Bool(OUTPUT)
 }
 
@@ -53,7 +57,7 @@ class ExampleTopZscale()(implicit p: Parameters) extends Module {
   if(p(useDM)) 
   {
     val debug = Module(LazyModule(new Debug).module)
-    io.dbgio <> debug.io
+    io.opt_port.dbgio <> debug.io
   }
   
   // PLIC
