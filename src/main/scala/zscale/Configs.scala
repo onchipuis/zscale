@@ -27,15 +27,18 @@ case object useAExt extends Field[Boolean]
 case object zscaleID extends Field[Int]
 case object useDM extends Field[Boolean]
 import rocketchip.IncludeJtagDTM
+import rocketchip.{JtagDTMKey,JtagDTMKeyDefault}
+import uncore.devices.DMKey
 case object IncludeSPIDTM extends Field[Boolean]
 case object IncludeI2CDTM extends Field[Boolean]
 import rocketchip.RTCPeriod
+import uncore.devices.NTiles
+import tile.MaxHartIdBits
 
 class BasePlatformConfig extends Config((site, here, up) => {
-  // DTS descriptive parameters (TODO: Not used yet)
-  case DTSModel => "ucbbar-uis,zscale-unknown"
-  case DTSCompat => Nil
-  case DTSTimebase => BigInt(1000000) // 1 MHz
+  // Debug Module
+  case DMKey => DefaultDebugModuleConfig(site(XLen))
+  case JtagDTMKey => new JtagDTMKeyDefault()
   // RTC module configuration (TODO: Not implemented yet)
   case RTCPeriod => BigInt(10000) // 10 KHz
   // Debug module configurations
@@ -51,6 +54,8 @@ class BaseCoreplexConfig extends Config ((site, here, up) => {
   case PAddrBits => 32
   case PgLevels => if (site(XLen) == 64) 3 /* Sv39 */ else 2 /* Sv32 */
   case ASIdBits => 0
+  case NTiles => 1  // TODO: only 1 tile
+  case MaxHartIdBits => log2Up(site(NTiles))
   // General
   case XLen => 64 
   case `useMExt` => true

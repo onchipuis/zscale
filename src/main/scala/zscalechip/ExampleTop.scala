@@ -12,34 +12,16 @@ import jtag.JTAGIO
 import rocketchip.{IncludeJtagDTM, JtagDTMConfig, JtagDTMKey, JtagDTMKeyDefault, DebugTransportModuleJTAG}
 import uncore.devices.ClockedDMIIO
 
-// INFO: Just imitated the instantiation because IDK about scala/chisel
-class Debug(implicit p: Parameters) extends BaseTop
-  with PeripheryDebug {
-  override lazy val module = new DebugModule(this, () => new DebugBundle(this))
-}
-class DebugBundle[+L <: Debug](_outer: L) extends BaseTopBundle(_outer)
-  with PeripheryDebugBundle
-class DebugModule[+L <: Debug, +B <: DebugBundle[L]](_outer: L, _io: () => B) extends BaseTopModule(_outer, _io)
-    with PeripheryDebugModule
-
 class ExampleTopZscaleBundle(implicit p: Parameters) extends Bundle {
+
+  // Mandatory Ports
   val mem = new MemIO
+  val trap = Bool(OUTPUT)
+  
   // INFO: This bundle holds all optional ports
   val opt_port = new Bundle {
-    val dbgio = if(p(useDM)) Some(new Bundle {
-      val debug = if(!p(IncludeJtagDTM)) Some(new ClockedDMIIO().flip) else None
-
-      val jtag        = if(p(IncludeJtagDTM)) Some(new JTAGIO(hasTRSTn = false).flip) else None
-      val jtag_reset  = if(p(IncludeJtagDTM)) Some(Bool(INPUT)) else None
-      val jtag_mfr_id = if(p(IncludeJtagDTM)) Some(UInt(INPUT, 11)) else None
-
-      val ndreset = Bool(OUTPUT)
-      val dmactive = Bool(OUTPUT)
-    })
-    else None
+    val dbgio = if(p(useDM)) Some[PeripheryDebugBundle](new PeripheryDebugBundle) else None
   }
-  
-  val trap = Bool(OUTPUT)
 }
 
 class ExampleTopZscale()(implicit p: Parameters) extends Module {
@@ -56,8 +38,8 @@ class ExampleTopZscale()(implicit p: Parameters) extends Module {
   // NOTE: This module implements DMI/JTAG automatically
   if(p(useDM)) 
   {
-    val debug = Module(LazyModule(new Debug).module)
-    io.opt_port.dbgio <> debug.io
+    val debug = Module(new PeripheryDebugModule)
+    io.opt_port.dbgio.foreach { dbgio => dbgio <> debug.io.dbgio }
   }
   
   // PLIC

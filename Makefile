@@ -13,8 +13,8 @@
 #TODO: change me: TestHarness
 XLEN ?= 64
 MODEL ?= ExampleTopZscale
-PROJECT ?= zscale
-CFG_PROJECT ?= $(PROJECT)
+PROJECT ?= zscalechip
+CFG_PROJECT ?= zscale
 CONFIG ?= Default$(XLEN)Config
 FIRRTL_JAR ?= rocket-chip/firrtl/utils/bin/firrtl.jar
 FIRRTL ?= java -Xmx2G -Xss8M -XX:MaxPermSize=256M -cp $(FIRRTL_JAR) firrtl.Driver
