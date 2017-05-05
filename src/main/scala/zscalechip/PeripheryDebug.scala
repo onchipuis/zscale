@@ -30,7 +30,7 @@ class DebugComBundle(implicit p: Parameters) extends Bundle {
 class PeripheryDebugBundle(implicit p: Parameters) extends Bundle {
   val dbgio = new DebugComBundle
   
-  val dmi = new ClockedDMIIO().flip
+  val dmi = new ClockedDMIIO()
   // TODO: Add the core interface
   // TODO: Add the master memory interface
 }
