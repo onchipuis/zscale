@@ -61,7 +61,7 @@ TEST_FUNC_NAME:				\
 	ebreak;
 
 #define RVTEST_CODE_END
-#define RVTEST_DATA_BEGIN .balign 4;
+#define RVTEST_DATA_BEGIN .balign 8;
 #define RVTEST_DATA_END
 
 #endif
