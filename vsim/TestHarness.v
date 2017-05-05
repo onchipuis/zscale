@@ -215,12 +215,13 @@ module zscale_wrapper #(
     .io_mem_dmem_hresp      (io_mem_dmem_hresp      ),
     
     // TODO: (Maybe) Not implemented
-    //.io_trap                (trap                   ),
     //.io_irq                 (irq                    ),
     //.io_trace_valid         (trace_valid            ),
     //.io_trace_data          (trace_data             ),
     
-    .io_success             (/*NOTHING*/            )
+    .io_trap                (trap                   )
+    
+    //.io_success             (/*NOTHING*/            )
   );
   
   // TODO: (Maybe) Not implemented workarounds
