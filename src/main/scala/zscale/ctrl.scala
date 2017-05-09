@@ -17,22 +17,22 @@ import HastiConstants._
 import tile.XLen 
 
 class MemIO(implicit p: Parameters) extends Bundle {
-    val imem = new HastiMasterIO()(p.alterPartial({
-      case HastiId => "00000"
-      case HastiKey("00000") => 
-        HastiParameters(
-          dataBits=p(XLen),
-          addrBits=p(XLen)
-        )
-    }))
-    val dmem = new HastiMasterIO()(p.alterPartial({
-      case HastiId => "00001"
-      case HastiKey("00001") => 
-        HastiParameters(
-          dataBits=p(XLen),
-          addrBits=p(XLen)
-        )
-    }))
+  val imem = new HastiMasterIO()(p.alterPartial({
+    case HastiId => "00000"
+    case HastiKey("00000") => 
+      HastiParameters(
+        dataBits=p(XLen),
+        addrBits=p(XLen)
+      )
+  }))
+  val dmem = new HastiMasterIO()(p.alterPartial({
+    case HastiId => "00001"
+    case HastiKey("00001") => 
+      HastiParameters(
+        dataBits=p(XLen),
+        addrBits=p(XLen)
+      )
+  }))
 }
 
 class CtrlDpathIO(implicit p: Parameters) extends ZscaleBundle {

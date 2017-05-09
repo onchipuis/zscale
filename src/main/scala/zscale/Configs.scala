@@ -34,6 +34,7 @@ case object IncludeI2CDTM extends Field[Boolean]
 import rocketchip.RTCPeriod
 import uncore.devices.NTiles
 import tile.MaxHartIdBits
+import zscaleuncore.devices.IncludeDMMem
 
 class BasePlatformConfig extends Config((site, here, up) => {
   // Debug Module
@@ -47,6 +48,7 @@ class BasePlatformConfig extends Config((site, here, up) => {
   // TODO: Unsupported, put always in false
   case `IncludeSPIDTM` => false
   case `IncludeI2CDTM` => false
+  case IncludeDMMem => true // Except for this (in testing)
 })
 
 class BaseCoreplexConfig extends Config ((site, here, up) => {
