@@ -109,7 +109,8 @@ endmodule
 module zscale_wrapper #(
   parameter AHB_TEST = 0,
   parameter VERBOSE = 0,
-  parameter XLen = 32
+  parameter XLen = 32,
+  parameter mem_bytes = 128*1024
 ) (
   input clk,
   input resetn,
@@ -154,7 +155,8 @@ module zscale_wrapper #(
   ahb_memory #(
     .AHB_TEST (AHB_TEST),
     .VERBOSE  (VERBOSE),
-    .XLen (XLen)
+    .XLen (XLen),
+    .mem_bytes(mem_bytes)
   ) mem (
     .clk                    (clk                    ),
     .reset                  (resetn                 ),
@@ -241,7 +243,7 @@ module zscale_wrapper #(
     $readmemh(firmware_file, mem.memory);
     // If xlen is 64, need to transform memory
     if(XLen == 64) begin
-      for(k = 0; k < (64*1024/4/2); k=k+1) begin
+      for(k = 0; k < (mem_bytes/4/2); k=k+1) begin
         mem.memory[k][31:0] = mem.memory[k*2][31:0];
         mem.memory[k][63:32] = mem.memory[k*2+1][31:0];
       end
@@ -276,7 +278,8 @@ endmodule
 module ahb_memory #(
   parameter AHB_TEST = 0,
   parameter VERBOSE = 0,
-  parameter XLen = 32
+  parameter XLen = 32,
+  parameter mem_bytes = 128*1024
 ) (
   input               clk,
   input               reset,
@@ -306,7 +309,7 @@ module ahb_memory #(
 
   output reg tests_passed
 );
-  reg [XLen-1:0]   memory [0:64*1024/4-1] /* verilator public */;
+  reg [XLen-1:0]   memory [0:mem_bytes/4-1] /* verilator public */;
   reg verbose;
   initial verbose = $test$plusargs("verbose") || VERBOSE;
 
@@ -392,7 +395,7 @@ module ahb_memory #(
   output              r_en;
   output [XLen-1:0]   rdata;
   begin
-    if (raddr < 64*1024) begin
+    if (raddr < mem_bytes) begin
       if(XLen == 64) begin
         rdata = memory[raddr >> 3];
       end else begin
@@ -417,7 +420,7 @@ module ahb_memory #(
   output              w_en;
   reg [XLen-1:0] wrdata;
   begin
-    if (waddr < 64*1024) begin
+    if (waddr < mem_bytes) begin
       if(XLen == 64) begin
         wrdata = wdata << ((waddr & 'h7) << 3);
         if (wstrb[0]) memory[waddr >> 3][ 7: 0] <= wrdata[ 7: 0];
