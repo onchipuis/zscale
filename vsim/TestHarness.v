@@ -442,6 +442,7 @@ module ahb_memory #(
         $display("WR: ADDR=%x DATA=%x STRB=%b", waddr, wrdata, wstrb);
     end else
     if (waddr == (XLen == 64? 64'h1000_0000:32'h1000_0000)) begin
+`ifndef NO_DISPLAY_ANYTHING
       if (verbose) begin
         if (32 <= wdata && wdata < 128)
           $display("OUT: '%c'", wdata[7:0]);
@@ -452,8 +453,9 @@ module ahb_memory #(
         //$display("OUT: '%c' %3d", wdata[7:0], wdata[7:0]);
 `ifndef VERILATOR
         $fflush();
-`endif
+`endif // VERILATOR
       end
+`endif // NO_DISPLAY_ANYTHING
     end else
     if (waddr == (XLen == 64? 64'h2000_0000:32'h2000_0000)) begin
       if (wdata == (XLen == 64? 64'd123456789:32'd123456789))
